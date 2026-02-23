@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Team Management{% endblock %}
+
+{% block header_title %}TEAM INVICTA – ADMIN{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+    <a href="{{ url_for('admin_team_add') }}" class="btn btn-primary">➕ ADD MEMBER</a>
+</div>
+
+<div class="panel">
+    <table class="hud-table" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Order</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Photo</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Name</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Role</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Bio</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in members %}
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ member.display_order }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">
+                    {% if member.photo_url %}
+                    <img src="{{ member.photo_url }}" alt="{{ member.name }}"
+                        style="width:50px; height:50px; object-fit:cover; border-radius:5px;">
+                    {% else %}
+                    <span style="color: #666;">No image</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ member.name }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ member.role }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ member.bio[:50] }}{% if
+                    member.bio|length > 50 %}...{% endif %}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">
+                    <a href="{{ url_for('admin_team_edit', id=member.id) }}" class="btn btn-small">EDIT</a>
+                    <form method="POST" action="{{ url_for('admin_team_delete', id=member.id) }}"
+                        style="display:inline;" onsubmit="return confirm('Delete this team member?');">
+                        <button type="submit" class="btn btn-small btn-danger">DELETE</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

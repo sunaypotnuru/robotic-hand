@@ -12,6 +12,7 @@ from flask_socketio import SocketIO, emit
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 import serial
 import serial.tools.list_ports
@@ -39,8 +40,29 @@ app = Flask(__name__,
 
 # Configuration from .env
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'luna_robotic_arm_secret_key_2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+mysqlconnector://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@{os.getenv('MYSQL_HOST', 'localhost')}/{os.getenv('MYSQL_DATABASE', 'luna_db')}"
+
+# Database Configuration (Supports MySQL and Supabase/PostgreSQL)
+db_url = os.getenv('DATABASE_URL')
+if not db_url:
+    # Fallback to individual components (MySQL legacy)
+    db_url = f"mysql+mysqlconnector://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}@{os.getenv('MYSQL_HOST', 'localhost')}/{os.getenv('MYSQL_DATABASE', 'luna_db')}"
+
+# SQLAlchemy 1.4+ / 2.0+ requires 'postgresql://' instead of 'postgres://'
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Upload settings
+UPLOAD_FOLDER = os.path.join(app.root_path, 'web_interface', 'static', 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Initialize Extensions
 db = SQLAlchemy(app)
@@ -56,8 +78,15 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.Enum('admin', 'operator'), nullable=False, default='operator')
+    role = db.Column(db.Enum('admin', 'operator', name='user_roles'), nullable=False, default='operator')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Profile Info
+    full_name = db.Column(db.String(100))
+    bio = db.Column(db.Text)
+    photo_url = db.Column(db.String(200))
+    linkedin_url = db.Column(db.String(200))
+    github_url = db.Column(db.String(200))
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -100,17 +129,28 @@ def load_user(user_id):
 
 def log_mission(command_type, details):
     """Log robotic actions to the database"""
-    if current_user.is_authenticated:
+    with app.app_context():
         try:
-            log = MissionLog(
-                user_id=current_user.id,
-                command=command_type,
-                robot_state=details
-            )
-            db.session.add(log)
-            db.session.commit()
+            from flask import has_request_context
+            user_id = None
+            if has_request_context() and current_user.is_authenticated:
+                user_id = current_user.id
+            else:
+                # For background tasks or unauthenticated actions, use the first admin
+                system_user = User.query.filter_by(role='admin').first()
+                if system_user:
+                    user_id = system_user.id
+            
+            if user_id:
+                log = MissionLog(
+                    user_id=user_id,
+                    command=command_type,
+                    robot_state=details
+                )
+                db.session.add(log)
+                db.session.commit()
         except Exception as e:
-            logger.error(f"❌ Mission log failed: {e}")
+            logger.error(f"⚠️  Mission log failed: {e}")
             db.session.rollback()
 
 def admin_required(f):
@@ -258,6 +298,10 @@ def send_motor_command(motor_id, angle, force=False):
     # Add to serial queue
     command = f"M:{motor_id}:{angle}\n"
     serial_queue.put(command)
+    
+    # Log the mission
+    log_mission('motor', {'motor_id': motor_id, 'angle': angle, 'timestamp': time.time()})
+    
     return True
 
 
@@ -282,6 +326,10 @@ def send_batch_commands(commands_dict):
     
     command = ":".join(batch_parts) + "\n"
     serial_queue.put(command)
+    
+    # Log the mission
+    log_mission('batch', {'commands': valid_commands, 'timestamp': time.time()})
+    
     return True
 
 
@@ -466,10 +514,9 @@ def logout():
 
 @app.route('/')
 def index():
-    """Main dashboard (Protected if not logged in)"""
+    """Public home or Mission Dashboard based on auth"""
     if not current_user.is_authenticated:
-        # Show a landing page or redirect
-        return render_template('index.html') # Need to update index.html to handle public/private
+        return render_template('home.html')
     return render_template('index.html')
 
 
@@ -489,18 +536,24 @@ def contact():
     address = SiteContent.query.filter_by(page_section='contact_address').first()
     github = SiteContent.query.filter_by(page_section='contact_github').first()
     linkedin = SiteContent.query.filter_by(page_section='contact_linkedin').first()
+    university = SiteContent.query.filter_by(page_section='institution_website').first()
     return render_template('contact.html',
                           email=email.content_text if email else None,
                           phone=phone.content_text if phone else None,
                           address=address.content_text if address else None,
                           github=github.content_text if github else None,
-                          linkedin=linkedin.content_text if linkedin else None)
+                          linkedin=linkedin.content_text if linkedin else None,
+                          university=university.content_text if university else None)
 
 
 @app.route('/features')
 def features():
-    """Features page"""
-    return render_template('features.html')
+    """Features page (Dynamic)"""
+    hardware = SiteContent.query.filter_by(page_section='tech_specs_hardware').first()
+    brain = SiteContent.query.filter_by(page_section='tech_specs_brain').first()
+    return render_template('features.html', 
+                          hardware=hardware.content_text if hardware else None,
+                          brain=brain.content_text if brain else None)
 
 
 @app.route('/team')
@@ -955,6 +1008,225 @@ def home_position():
 
 
 # ==================== INITIALIZATION ====================
+
+# ==================== ADMIN & OPERATOR ROUTES ====================
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    user_count = User.query.count()
+    team_count = TeamMember.query.count()
+    log_count = MissionLog.query.count()
+    return render_template('admin/dashboard.html',
+                           user_count=user_count,
+                           team_count=team_count,
+                           log_count=log_count)
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    users = User.query.all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/users/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_user_add():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        role = request.form['role']
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists.', 'danger')
+            return redirect(url_for('admin_user_add'))
+        user = User(username=username, role=role)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        flash('User created.', 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin/user_form.html', user=None)
+
+@app.route('/admin/users/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_user_edit(id):
+    user = User.query.get_or_404(id)
+    if request.method == 'POST':
+        user.username = request.form['username']
+        user.role = request.form['role']
+        if request.form['password']:
+            user.set_password(request.form['password'])
+        db.session.commit()
+        flash('User updated.', 'success')
+        return redirect(url_for('admin_users'))
+    return render_template('admin/user_form.html', user=user)
+
+@app.route('/admin/users/delete/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_user_delete(id):
+    user = User.query.get_or_404(id)
+    if user.id == current_user.id:
+        flash('You cannot delete yourself.', 'danger')
+        return redirect(url_for('admin_users'))
+    db.session.delete(user)
+    db.session.commit()
+    flash('User deleted.', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/team')
+@login_required
+@admin_required
+def admin_team():
+    members = TeamMember.query.order_by(TeamMember.display_order).all()
+    return render_template('admin/team_list.html', members=members)
+
+@app.route('/admin/team/add', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_team_add():
+    if request.method == 'POST':
+        name = request.form['name']
+        role = request.form['role']
+        bio = request.form['bio']
+        linkedin = request.form.get('linkedin_url', '')
+        github = request.form.get('github_url', '')
+        display_order = int(request.form.get('display_order', 0))
+        
+        photo_url = ''
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                filename = f"{int(time.time())}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                photo_url = f'/static/uploads/{filename}'
+        
+        member = TeamMember(
+            name=name,
+            role=role,
+            bio=bio,
+            photo_url=photo_url,
+            linkedin_url=linkedin,
+            github_url=github,
+            display_order=display_order
+        )
+        db.session.add(member)
+        db.session.commit()
+        flash('Team member added.', 'success')
+        return redirect(url_for('admin_team'))
+    return render_template('admin/team_form.html', member=None)
+
+@app.route('/admin/team/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_team_edit(id):
+    member = TeamMember.query.get_or_404(id)
+    if request.method == 'POST':
+        member.name = request.form['name']
+        member.role = request.form['role']
+        member.bio = request.form['bio']
+        member.linkedin_url = request.form.get('linkedin_url', '')
+        member.github_url = request.form.get('github_url', '')
+        member.display_order = int(request.form.get('display_order', 0))
+        
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename != '' and allowed_file(file.filename):
+                if member.photo_url and member.photo_url.startswith('/static/uploads/'):
+                    old_path = os.path.join(app.root_path, 'web_interface', member.photo_url.lstrip('/'))
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                filename = secure_filename(file.filename)
+                filename = f"{int(time.time())}_{filename}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                member.photo_url = f'/static/uploads/{filename}'
+        
+        db.session.commit()
+        flash('Team member updated.', 'success')
+        return redirect(url_for('admin_team'))
+    return render_template('admin/team_form.html', member=member)
+
+@app.route('/admin/team/delete/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_team_delete(id):
+    member = TeamMember.query.get_or_404(id)
+    if member.photo_url and member.photo_url.startswith('/static/uploads/'):
+        path = os.path.join(app.root_path, 'web_interface', member.photo_url.lstrip('/'))
+        if os.path.exists(path):
+            os.remove(path)
+    db.session.delete(member)
+    db.session.commit()
+    flash('Team member deleted.', 'success')
+    return redirect(url_for('admin_team'))
+
+@app.route('/admin/content')
+@login_required
+@admin_required
+def admin_content():
+    contents = SiteContent.query.order_by(SiteContent.page_section).all()
+    return render_template('admin/content_list.html', contents=contents)
+
+@app.route('/admin/content/edit/<string:section>', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_content_edit(section):
+    content = SiteContent.query.filter_by(page_section=section).first()
+    if not content:
+        content = SiteContent(page_section=section, content_text='')
+    if request.method == 'POST':
+        content.content_text = request.form['content_text']
+        db.session.add(content)
+        db.session.commit()
+        flash('Content updated.', 'success')
+        return redirect(url_for('admin_content'))
+    return render_template('admin/content_form.html', section=section, content=content)
+
+@app.route('/admin/logs')
+@login_required
+@admin_required
+def admin_logs():
+    page = request.args.get('page', 1, type=int)
+    logs = MissionLog.query.order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+    return render_template('admin/logs.html', logs=logs)
+
+@app.route('/logs')
+@login_required
+def mission_logs():
+    page = request.args.get('page', 1, type=int)
+    if current_user.role == 'admin':
+        logs = MissionLog.query.order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+    else:
+        logs = MissionLog.query.filter_by(user_id=current_user.id).order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+    return render_template('logs.html', logs=logs)
+
+@app.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html')
+
+@app.route('/profile/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        current_password = request.form['current_password']
+        new_password = request.form['new_password']
+        confirm = request.form['confirm_password']
+        
+        if not current_user.check_password(current_password):
+            flash('Current encryption key is incorrect.', 'danger')
+        elif new_password != confirm:
+            flash('New encryption keys do not match.', 'danger')
+        else:
+            current_user.set_password(new_password)
+            db.session.commit()
+            flash('Encryption key updated successfully.', 'success')
+            return redirect(url_for('profile'))
+    return render_template('change_password.html')
 
 def init_ai_modules():
     """Initialize AI modules in background"""

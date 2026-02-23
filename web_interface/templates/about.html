@@ -1,1 +1,16 @@
-</html>
+{% extends "base.html" %}
+
+{% block title %}About{% endblock %}
+
+{% block header_title %}MISSION OVERVIEW{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="about-content" style="line-height: 1.6; font-size: 1.1rem; color: #ddd;">
+        <h2 style="color: #00f3ff; margin-bottom: 20px;">PROJECT LUNA</h2>
+        {{ description|safe if description else '<p>Project LUNA is a 4-DOF robotic arm powered by Gemini AI, designed
+            for research and education in robotics.</p>
+        <p>Developed by Team Invicta at Universal AI University, Karjat.</p>'|safe }}
+    </div>
+</div>
+{% endblock %}

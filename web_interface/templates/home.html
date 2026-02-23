@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Home — Project LUNA{% endblock %}
+
+{% block header_title %}PROJECT LUNA{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 40px; padding: 20px 0;">
+
+    <!-- Hero Section -->
+    <div class="panel" style="text-align: center; padding: 60px 40px; position: relative; overflow: hidden;">
+        <div
+            style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at center, rgba(0,243,255,0.05) 0%, transparent 70%); pointer-events: none;">
+        </div>
+        <h1
+            style="font-family: 'Orbitron', sans-serif; font-size: 3.5rem; font-weight: 900; color: #00f3ff; text-shadow: 0 0 20px #00f3ff, 0 0 40px rgba(0,243,255,0.5); letter-spacing: 6px; margin-bottom: 10px;">
+            L.U.N.A</h1>
+        <p style="color: rgba(0,243,255,0.7); letter-spacing: 4px; font-size: 0.9rem; margin-bottom: 30px;">LINKED
+            UNIVERSAL NEURAL ARM</p>
+        <p style="color: #aaa; max-width: 700px; margin: 0 auto 40px; line-height: 1.8; font-size: 1.05rem;">
+            A next-generation cyber-physical system integrating <strong style="color: #00f3ff;">deep learning</strong>,
+            <strong style="color: #00f3ff;">real-time computer vision</strong>, and <strong
+                style="color: #00f3ff;">cloud-based AI</strong>
+            into a single, cohesive robotic platform.
+        </p>
+        <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+            <a href="{{ url_for('login') }}" class="btn btn-primary"
+                style="text-decoration: none; padding: 15px 40px; font-size: 1.1rem; letter-spacing: 2px;">
+                🔑 OPERATOR LOGIN
+            </a>
+            <a href="{{ url_for('about') }}" class="btn btn-secondary"
+                style="text-decoration: none; padding: 15px 40px; font-size: 1.1rem; letter-spacing: 2px;">
+                ℹ️ LEARN MORE
+            </a>
+        </div>
+    </div>
+
+    <!-- Feature Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        <div class="panel" style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 15px;">🧠</div>
+            <h3 style="font-family: 'Orbitron', sans-serif; color: #00f3ff; margin-bottom: 10px; letter-spacing: 2px;">
+                GEMINI AI CORE</h3>
+            <p style="color: #aaa; line-height: 1.7;">Powered by Google Gemini 1.5 Pro. LUNA understands natural
+                language, parses intent, and executes precision commands as JSON.</p>
+        </div>
+        <div class="panel" style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 15px;">👁️</div>
+            <h3 style="font-family: 'Orbitron', sans-serif; color: #00f3ff; margin-bottom: 10px; letter-spacing: 2px;">
+                SPATIAL AWARENESS</h3>
+            <p style="color: #aaa; line-height: 1.7;">YOLOv8 object detection and MediaPipe hand tracking give LUNA
+                real-time environmental awareness for pinpoint accuracy.</p>
+        </div>
+        <div class="panel" style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 15px;">⚡</div>
+            <h3 style="font-family: 'Orbitron', sans-serif; color: #00f3ff; margin-bottom: 10px; letter-spacing: 2px;">
+                4-DOF PRECISION</h3>
+            <p style="color: #aaa; line-height: 1.7;">260° combined range of motion across 8 high-torque DS-series
+                servos with Split-Logic PWM safety preventing stall damage.</p>
+        </div>
+    </div>
+
+    <!-- Institution Tag — fully clickable card via onclick -->
+    <div class="panel" id="uni-card"
+        style="text-align: center; padding: 30px; cursor: pointer; transition: border-color 0.3s, box-shadow 0.3s;"
+        onclick="window.open('https://www.universalai.in/', '_blank')"
+        onmouseover="this.style.borderColor='#00f3ff'; this.style.boxShadow='0 0 25px rgba(0,243,255,0.4)';"
+        onmouseout="this.style.borderColor=''; this.style.boxShadow='';">
+        <p style="color: rgba(0,243,255,0.5); letter-spacing: 3px; font-size: 0.8rem; pointer-events: none;">DEVELOPED
+            AT</p>
+        <h3
+            style="font-family: 'Orbitron', sans-serif; color: #00f3ff; margin: 10px 0 5px; letter-spacing: 2px; pointer-events: none;">
+            UNIVERSAL AI UNIVERSITY ↗
+        </h3>
+        <p style="color: #aaa; font-size: 0.85rem; pointer-events: none;">Department of AI &amp; ML Engineering —
+            Karjat, Maharashtra, India</p>
+        <p
+            style="color: rgba(0,243,255,0.4); margin-top: 15px; letter-spacing: 2px; font-size: 0.75rem; pointer-events: none;">
+            BY TEAM INVICTA</p>
+    </div>
+
+</div>
+{% endblock %}

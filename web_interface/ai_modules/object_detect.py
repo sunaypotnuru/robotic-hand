@@ -5,7 +5,6 @@ YOLOv8 for Object Tracking and Click-to-Pick
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
 import threading
 
 
@@ -28,6 +27,7 @@ class ObjectDetector:
         self.lock = threading.Lock()
         
         try:
+            from ultralytics import YOLO
             # Load YOLOv8 model (will download if not found)
             self.model = YOLO(model_path)
             print(f"✅ YOLOv8 model loaded: {model_path}")

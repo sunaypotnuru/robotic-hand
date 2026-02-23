@@ -7,7 +7,6 @@ import threading
 import queue
 import json
 import os
-import google.generativeai as genai
 from dotenv import load_dotenv
 import logging
 
@@ -43,6 +42,7 @@ class VoiceCommandProcessor:
         
         try:
             if self.api_key:
+                import google.generativeai as genai
                 genai.configure(api_key=self.api_key)
                 
                 # Robust Model Selection with Deep Validation

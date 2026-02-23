@@ -31,8 +31,8 @@ body {
     background-position: center;
     color: var(--neon-cyan);
     min-height: 100vh;
-    padding: 20px;
-    overflow-x: hidden;
+    padding: 0;
+    overflow: hidden;
     position: relative;
     animation: grid-movement 100s linear infinite;
 }
@@ -104,9 +104,10 @@ body::before {
     left: 0;
     display: flex;
     flex-direction: column;
-    padding: 30px 20px;
+    padding: 30px 20px 20px;
     z-index: 1000;
     box-shadow: 10px 0 30px rgba(0, 243, 255, 0.1);
+    overflow: hidden;
 }
 
 .sidebar-logo {
@@ -123,7 +124,10 @@ body::before {
 .nav-menu {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 10px;
 }
 
 .nav-item {
@@ -167,6 +171,9 @@ body::before {
     flex-direction: column;
     gap: 20px;
     z-index: 2;
+    min-height: 100vh;
+    overflow-y: auto;
+    height: 100vh;
 }
 
 /* Header - HUD Style */
@@ -175,13 +182,14 @@ header {
     backdrop-filter: blur(15px);
     border: 1px solid rgba(0, 243, 255, 0.3);
     border-radius: 12px;
-    padding: 20px 30px;
+    padding: 12px 24px;
     box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
     position: relative;
     overflow: hidden;
+    min-height: 60px;
 }
 
 header::before {
@@ -205,9 +213,16 @@ header::before {
     }
 }
 
+.mission-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+}
+
 header h1 {
     font-family: 'Orbitron', sans-serif;
-    font-size: 2.5em;
+    font-size: 1.6em;
     font-weight: 900;
     color: var(--neon-cyan);
     text-shadow:
@@ -215,7 +230,15 @@ header h1 {
         0 0 20px var(--neon-cyan),
         0 0 30px var(--neon-cyan);
     letter-spacing: 3px;
-    margin-bottom: 10px;
+    margin: 0;
+    line-height: 1.2;
+}
+
+header p {
+    margin: 0;
+    font-size: 0.7rem;
+    color: rgba(0, 243, 255, 0.5);
+    letter-spacing: 2px;
 }
 
 .status-bar {

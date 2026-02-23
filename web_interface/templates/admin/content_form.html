@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ section }}{% endblock %}
+
+{% block header_title %}EDIT: {{ section|upper }}{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width: 800px; margin: 0 auto;">
+    <form method="POST">
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px; color: #00f3ff;">Content</label>
+            <textarea name="content_text" rows="10" class="hud-input"
+                style="width: 100%; background: rgba(0,0,0,0.5); border: 1px solid #00f3ff; color: white; padding: 10px;">{{ content.content_text }}</textarea>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" class="btn btn-primary">SAVE</button>
+            <a href="{{ url_for('admin_content') }}" class="btn btn-secondary">CANCEL</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,68 +1,45 @@
 {% extends "base.html" %}
 
-{% block title %}Team{% endblock %}
+{% block title %}Team Invicta{% endblock %}
 
-{% block header_title %}TEAM INVICTA{% endblock %}
+{% block header_title %}TEAM INVICTA OPERATIVES{% endblock %}
 
 {% block content %}
-<div class="team-container">
-    <div class="card-grid">
-        {% for member in members %}
-        <div class="hud-card team-card">
-            <h3>{{ member.name }}</h3>
-            <p class="role">{{ member.role }}</p>
-            <p>{{ member.bio }}</p>
-            <div class="social-links" style="margin-top: 15px;">
-                {% if member.github_url %}<a href="{{ member.github_url }}" class="social-link">GITHUB</a>{% endif %}
-                {% if member.linkedin_url %}<a href="{{ member.linkedin_url }}" class="social-link">LINKEDIN</a>{% endif
-                %}
-            </div>
+<div class="team-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+    {% for member in members %}
+    <div class="panel team-card" style="text-align: center;">
+        <div class="member-photo" style="margin-bottom: 20px;">
+            {% if member.photo_url %}
+            <img src="{{ member.photo_url }}" alt="{{ member.name }}"
+                style="width: 150px; height: 150px; object-fit: cover; border-radius: 50%; border: 3px solid #00f3ff; box-shadow: 0 0 20px rgba(0,243,255,0.3);">
+            {% else %}
+            <div
+                style="width: 150px; height: 150px; background: rgba(0,243,255,0.1); border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; border: 3px solid #00f3ff; font-size: 3rem;">
+                👥</div>
+            {% endif %}
         </div>
-        {% else %}
-        <!-- Fallback if database is empty initially -->
-        <div class="hud-card">
-            <h3>Sunay</h3>
-            <p class="role">Computer Vision & AI Integration Specialist</p>
-            <p>Focusing on LUNA's "senses," Sunay oversees the implementation of the advanced AI tracking models.</p>
-        </div>
-        <div class="hud-card">
-            <h3>Rohith</h3>
-            <p class="role">Lead Systems Architect & Developer</p>
-            <p>Driving the core vision of Project LUNA, Rohith architects the central Flask backend.</p>
-        </div>
-        {% endfor %}
-    </div>
+        <h2 style="color: #00f3ff; margin-bottom: 5px;">{{ member.name }}</h2>
+        <h3
+            style="color: #aaa; margin-bottom: 15px; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 2px;">
+            {{ member.role }}</h3>
+        <p style="color: #ddd; line-height: 1.5; margin-bottom: 20px;">{{ member.bio }}</p>
 
-    <div class="robot-speech-terminal">
-        <p id="robot-speech">🤖 LUNA: "Scanning biometric data... Team recognized. Welcome back, Commanders."</p>
+        <div class="member-links" style="display: flex; justify-content: center; gap: 15px;">
+            {% if member.linkedin_url %}
+            <a href="{{ member.linkedin_url }}" target="_blank" title="LinkedIn"
+                style="font-size: 1.5rem; color: #00f3ff;">🔗</a>
+            {% endif %}
+            {% if member.github_url %}
+            <a href="{{ member.github_url }}" target="_blank" title="GitHub"
+                style="font-size: 1.5rem; color: #00f3ff;">🐙</a>
+            {% endif %}
+        </div>
     </div>
+    {% else %}
+    <div class="panel" style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+        <h2 style="color: #00f3ff;">NO OPERATIVES FOUND</h2>
+        <p>The operative database is currently empty.</p>
+    </div>
+    {% endfor %}
 </div>
-
-<style>
-    .card-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-        gap: 30px;
-    }
-
-    .role {
-        color: #00f3ff;
-        font-size: 0.9rem;
-        font-weight: bold;
-        margin-bottom: 20px;
-    }
-
-    .social-link {
-        font-size: 0.8rem;
-        color: #fff;
-        text-decoration: none;
-        padding: 5px 10px;
-        border: 1px solid rgba(0, 243, 255, 0.4);
-        margin-right: 10px;
-    }
-
-    .social-link:hover {
-        background: rgba(0, 243, 255, 0.1);
-    }
-</style>
 {% endblock %}

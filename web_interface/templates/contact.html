@@ -1,10 +1,48 @@
-<div class="robot-speech-terminal">
-    <h3>🤖 SPEECH TERMINAL:</h3>
-    <div id="robot-speech" class="robot-speech-text">Ready for signal uplink...</div>
-</div>
-</main>
-</div>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
+{% extends "base.html" %}
 
-</html>
+{% block title %}Contact{% endblock %}
+
+{% block header_title %}CONTACT MISSION CONTROL{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <div class="contact-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px;">
+        <div class="contact-info">
+            <h2 style="color: #00f3ff; margin-bottom: 20px;">GET IN TOUCH</h2>
+            <p style="margin: 15px 0;"><span class="label"
+                    style="color: #00f3ff; display: inline-block; width: 100px;">EMAIL:</span> {{ email or
+                'luna@invicta.io' }}</p>
+            <p style="margin: 15px 0;"><span class="label"
+                    style="color: #00f3ff; display: inline-block; width: 100px;">PHONE:</span> {{ phone or '+1 555-LUNA'
+                }}</p>
+            <p style="margin: 15px 0;"><span class="label"
+                    style="color: #00f3ff; display: inline-block; width: 100px;">ADDRESS:</span> {{ address or 'Grid
+                Sector 7, Neo-Tech District' }}</p>
+        </div>
+
+        {% if current_user.is_authenticated %}
+        <div class="secure-links">
+            <h2 style="color: #00f3ff; margin-bottom: 20px;">PROJECT LINKS</h2>
+            <p style="margin: 15px 0;"><span class="label"
+                    style="color: #00f3ff; display: inline-block; width: 100px;">GITHUB:</span> <a
+                    href="https://{{ github if github else '#' }}" target="_blank"
+                    style="color: #fff; text-decoration: underline;">{{
+                    github or 'github.com/TeamInvicta/Project-LUNA' }}</a></p>
+            <p style="margin: 15px 0;"><span class="label"
+                    style="color: #00f3ff; display: inline-block; width: 100px;">UNIVERSITY:</span> <a
+                    href="https://{{ university if university else 'www.universalai.in' }}" target="_blank"
+                    style="color: #fff; text-decoration: underline;">{{ university or 'Universal AI University' }}</a>
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- The Robot Speech Terminal -->
+    <div class="contact-terminal"
+        style="margin-top: 40px; background: rgba(0,0,0,0.8); border: 1px solid #00f3ff; padding: 20px; font-family: 'Courier New', Courier, monospace;">
+        <div style="color: #00f3ff; margin-bottom: 10px;">> TRANSMISSION STATUS: READY</div>
+        <div style="color: #aaa;">How can I assist your mission today?</div>
+    </div>
+</div>
+{% endblock %}

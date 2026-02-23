@@ -89,14 +89,24 @@
                 <!-- AI Personality Panel -->
                 <div class="panel">
                     <h2>🧠 AI PERSONALITY</h2>
-                    <div class="input-group">
+                    <div class="hud-input-group">
                         <label>SYSTEM PROMPT / DIRECTIVE</label>
-                        <textarea id="ai-prompt" class="hud-input"
-                            placeholder="Enter robot directive (e.g., 'Sarcastic Assistant')"></textarea>
+                        <div class="hud-textarea-wrapper">
+                            <textarea id="ai-prompt" class="hud-input hud-textarea" rows="5"
+                                placeholder="ENTER ROBOT DIRECTIVE (E.G. 'SARCASTIC ASSISTANT')"></textarea>
+                            <div class="hud-corner top-left"></div>
+                            <div class="hud-corner top-right"></div>
+                            <div class="hud-corner bottom-left"></div>
+                            <div class="hud-corner bottom-right"></div>
+                        </div>
                     </div>
-                    <button id="update-ai" class="btn btn-primary" style="margin-top: 15px; width: 100%;">APPLY
-                        DIRECTIVE</button>
-                    <p class="hint">Changes how Gemini interprets commands and responds.</p>
+                    <button id="update-ai" class="btn btn-primary btn-full" style="margin-top: 20px;">
+                        EXECUTE DIRECTIVE UPDATE
+                    </button>
+                    <p class="hint"
+                        style="margin-top: 15px; border-top: 1px solid rgba(0, 243, 255, 0.1); padding-top: 10px;">
+                        ADJUSTS COGNITIVE PARAMETERS FOR GEMINI OUTPUTS.
+                    </p>
                 </div>
             </div>
 

@@ -11,16 +11,16 @@ def bootstrap():
         print("✅ Database tables created.")
 
         # 2. Create Admin User
-        admin_user = User.query.filter_by(role='admin').first()
+        admin_email = "sunaypotnuru@gmail.com"
+        admin_user = User.query.filter_by(username=admin_email).first()
         if not admin_user:
-            username = "admin"
-            password = "password123" # User should change this
-            new_admin = User(username=username, role='admin')
+            password = "surya1688*"
+            new_admin = User(username=admin_email, role='admin')
             new_admin.set_password(password)
             db.session.add(new_admin)
-            print(f"✅ Admin user created: {username} / {password}")
+            print(f"✅ Admin user created: {admin_email} / {password}")
         else:
-            print("ℹ️ Admin user already exists.")
+            print(f"ℹ️ Admin user {admin_email} already exists.")
 
         # 3. Populate Initial CMS Content
         initial_content = {

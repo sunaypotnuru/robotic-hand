@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LUNA - {% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='hud_styles.css') }}">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     {% block head %}{% endblock %}
 </head>
@@ -46,6 +47,18 @@
                     <span>CONTACT</span>
                 </a>
 
+                {% if current_user.is_authenticated %}
+                <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+                <a href="{{ url_for('mission_logs') }}" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>MY LOGS</span>
+                </a>
+                <a href="{{ url_for('profile') }}" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>PROFILE</span>
+                </a>
+                {% endif %}
+
                 {% if current_user.is_authenticated and current_user.role == 'admin' %}
                 <div class="nav-divider" style="height: 1px; background: rgba(255, 0, 153, 0.2); margin: 10px 0;"></div>
                 <a href="/admin" class="nav-item admin-nav">
@@ -60,7 +73,8 @@
                 <div class="user-info" style="margin-bottom: 10px; font-size: 0.8rem; color: #00f3ff;">
                     👤 {{ current_user.username }} [{{ current_user.role|upper }}]
                 </div>
-                <a href="{{ url_for('logout') }}" class="nav-item" style="color: #ff3e3e;">
+                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-full"
+                    style="text-align: center; text-decoration: none; display: block; margin-top: 10px;">
                     <span class="nav-icon">🚪</span>
                     <span>LOGOUT</span>
                 </a>
@@ -85,7 +99,7 @@
                 </div>
             </header>
 
-            <div class="content-body" style="padding: 30px; height: calc(100vh - 100px); overflow-y: auto;">
+            <div class="content-body" style="padding: 30px;">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                 {% for category, message in messages %}

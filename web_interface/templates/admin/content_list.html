@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Site Content{% endblock %}
+
+{% block header_title %}SITE CONTENT MANAGER{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <table class="hud-table" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Page Section</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Content Preview</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in contents %}
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ item.page_section }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ item.content_text[:100] }}{%
+                    if item.content_text|length > 100 %}...{% endif %}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">
+                    <a href="{{ url_for('admin_content_edit', section=item.page_section) }}"
+                        class="btn btn-small">EDIT</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3" style="padding: 20px; text-align: center; color: #666;">No content entries yet. Run
+                    create_admin.py to populate.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

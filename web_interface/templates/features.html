@@ -1,26 +1,61 @@
-<div class="card-grid" style="margin-top: 20px;">
-    <div class="hud-card">
-        <h3>👁️ Spatial Vision</h3>
-        <p>RTX 4060 GPU runs YOLOv8 for real-time detection and MediaPipe hand-tracking mimicry.</p>
+{% extends "base.html" %}
+
+{% block title %}Features{% endblock %}
+
+{% block header_title %}SYSTEM CAPABILITIES{% endblock %}
+
+{% block content %}
+<div class="panel" style="margin-bottom: 30px;">
+    <h2 style="color: #00f3ff; margin-bottom: 20px;">THE MECHANICS & THE MIND</h2>
+
+    <div class="spec-section" style="margin-bottom: 25px;">
+        <h3 style="color: #00f3ff;">🛠️ The Hardware: Fluidity & Flexibility</h3>
+        <p style="color: #ddd; line-height: 1.6;">
+            {{ hardware if hardware else 'LUNA is a highly advanced 4-DOF robotic arm designed for precision and fluid
+            movement.' }}
+        </p>
     </div>
-    <div class="hud-card">
-        <h3>🎮 Teleoperation</h3>
-        <p>Velocity Control logic for Xbox/PS4 controllers—enabling weightless, anti-gravity movement.</p>
-    </div>
-    <div class="hud-card">
-        <h3>🛑 Safety Perimeter</h3>
-        <p>Hardware-level protection with VL53L0X laser sensors. Automatic kill-switch triggers if perimeter
-            is breached.</p>
+
+    <div class="spec-section">
+        <h3 style="color: #00f3ff;">🧠 The Brain: Powered by Google Gemini</h3>
+        <p style="color: #ddd; line-height: 1.6; white-space: pre-line;">
+            {{ brain if brain else 'Powered by the cutting-edge Google Gemini AI ecosystem for true generative
+            intelligence.' }}
+        </p>
     </div>
 </div>
 
-<div class="robot-speech-terminal">
-    <h3>🤖 SPEECH TERMINAL:</h3>
-    <div id="robot-speech" class="robot-speech-text">Scanning capability tiers...</div>
+<h2 style="color: #00f3ff; margin-bottom: 20px;">CORE CAPABILITIES</h2>
+<div class="card-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+    <div class="hud-card panel">
+        <h3 style="color: #00f3ff;">👁️ Spatial Vision</h3>
+        <p style="color: #ddd; margin-top: 10px;">RTX 4060 GPU runs YOLOv8 for real-time object detection and MediaPipe
+            for hand-tracking mimicry.</p>
+    </div>
+    <div class="hud-card panel">
+        <h3 style="color: #00f3ff;">🎮 Teleoperation</h3>
+        <p style="color: #ddd; margin-top: 10px;">Velocity Control logic for Xbox/PS4 controllers—enabling weightless,
+            anti-gravity movement.</p>
+    </div>
+    <div class="hud-card panel">
+        <h3 style="color: #00f3ff;">🛑 Safety Perimeter</h3>
+        <p style="color: #ddd; margin-top: 10px;">Hardware-level protection with VL53L0X laser sensors. Automatic
+            kill-switch triggers if perimeter is breached.</p>
+    </div>
+    <div class="hud-card panel">
+        <h3 style="color: #00f3ff;">🧠 Gemini AI Integration</h3>
+        <p style="color: #ddd; margin-top: 10px;">Natural language understanding via Google's Gemini API for voice
+            commands and contextual responses.</p>
+    </div>
+    <div class="hud-card panel">
+        <h3 style="color: #00f3ff;">📡 Cloud‑Connected</h3>
+        <p style="color: #ddd; margin-top: 10px;">Mission logs and user data stored securely in Supabase (PostgreSQL)
+            for remote monitoring.</p>
+    </div>
+    <div class="hud-card panel">
+        <h3 style="color: #00f3ff;">🔐 Role‑Based Access</h3>
+        <p style="color: #ddd; margin-top: 10px;">Separate operator and admin privileges with a customizable content
+            management system.</p>
+    </div>
 </div>
-</main>
-</div>
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
-
-</html>
+{% endblock %}

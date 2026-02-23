@@ -5,28 +5,23 @@
 {% block header_title %}SECURITY CLEARANCE REQUIRED{% endblock %}
 
 {% block content %}
-<div class="login-container" style="max-width: 450px; margin: 50px auto;">
-    <div class="hud-card login-card">
+<div class="hud-form-container">
+    <div class="hud-card auth-card panel">
         <h2 class="glitch-text">OPERATOR AUTHENTICATION</h2>
         <p style="font-size: 0.8rem; color: #ff3e3e; margin-bottom: 20px;">READY_STATUS: LOCKED | AWAITING CREDENTIALS
         </p>
 
         <form method="POST">
-            <div class="hud-input-group" style="margin-bottom: 20px;">
-                <label
-                    style="display: block; color: #00f3ff; margin-bottom: 5px; font-size: 0.8rem;">OPERATOR_ID</label>
-                <input type="text" name="username" required autofocus
-                    style="width: 100%; background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.3); color: #fff; padding: 12px; outline: none;">
+            <div class="hud-input-group">
+                <label>OPERATOR_ID</label>
+                <input type="text" name="username" required autofocus class="hud-input">
             </div>
-            <div class="hud-input-group" style="margin-bottom: 30px;">
-                <label
-                    style="display: block; color: #00f3ff; margin-bottom: 5px; font-size: 0.8rem;">ENCRYPTION_KEY</label>
-                <input type="password" name="password" required
-                    style="width: 100%; background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.3); color: #fff; padding: 12px; outline: none;">
+            <div class="hud-input-group">
+                <label>ENCRYPTION_KEY</label>
+                <input type="password" name="password" required class="hud-input">
             </div>
 
-            <button type="submit" class="btn-primary"
-                style="width: 100%; background: #00f3ff; color: #000; padding: 15px; border: none; font-weight: bold; cursor: pointer; letter-spacing: 2px;">
+            <button type="submit" class="btn btn-primary btn-full">
                 ESTABLISH UPLINK
             </button>
         </form>
@@ -39,29 +34,4 @@
         </div>
     </div>
 </div>
-
-<style>
-    .login-card {
-        border-top: 4px solid #00f3ff;
-        animation: slideIn 0.5s ease;
-    }
-
-    @keyframes slideIn {
-        from {
-            transform: translateY(20px);
-            opacity: 0;
-        }
-
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
-
-    .glitch-text {
-        font-size: 1.5rem;
-        letter-spacing: 3px;
-        margin-bottom: 5px;
-    }
-</style>
 {% endblock %}

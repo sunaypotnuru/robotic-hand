@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users{% endblock %}
+
+{% block header_title %}USER DIRECTORY{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+    <a href="{{ url_for('admin_user_add') }}" class="btn btn-primary">➕ NEW OPERATOR</a>
+</div>
+
+<div class="panel">
+    <table class="hud-table" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    ID</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Username</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Role</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Created</th>
+                <th
+                    style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">
+                    Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ user.id }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ user.username }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{ user.role|upper }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">{{
+                    user.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.2);">
+                    <a href="{{ url_for('admin_user_edit', id=user.id) }}" class="btn btn-small">EDIT</a>
+                    {% if user.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('admin_user_delete', id=user.id) }}" style="display:inline;"
+                        onsubmit="return confirm('Delete this user?');">
+                        <button type="submit" class="btn btn-small btn-danger">DELETE</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

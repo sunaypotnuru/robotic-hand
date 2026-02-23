@@ -4,7 +4,6 @@ MediaPipe for Hand Gesture Mimicry
 """
 
 import cv2
-import mediapipe as mp
 import numpy as np
 import threading
 
@@ -27,15 +26,17 @@ class HandTracker:
         self.min_detection_confidence = min_detection_confidence
         self.min_tracking_confidence = min_tracking_confidence
         
-        # Initialize MediaPipe
-        self.mp_hands = mp.solutions.hands
-        self.mp_drawing = mp.solutions.drawing_utils
-        self.hands = None
+        # Initialize landmarks and gestures
         self.landmarks = []
         self.gestures = {}
         self.lock = threading.Lock()
+        self.hands = None
         
         try:
+            import mediapipe as mp
+            self.mp_hands = mp.solutions.hands
+            self.mp_drawing = mp.solutions.drawing_utils
+            
             self.hands = self.mp_hands.Hands(
                 static_image_mode=False,
                 max_num_hands=max_hands,
