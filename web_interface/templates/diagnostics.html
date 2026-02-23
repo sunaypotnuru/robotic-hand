@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUNA - Diagnostics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <div class="app-wrap">
+        <!-- Persistent Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">LUNA</div>
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>DASHBOARD</span>
+                </a>
+                <a href="/settings" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span>AI SETTINGS</span>
+                </a>
+                <a href="/diagnostics" class="nav-item active">
+                    <span class="nav-icon">🛠️</span>
+                    <span>DIAGNOSTICS</span>
+                </a>
+                <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+                <a href="/features" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>FEATURES</span>
+                </a>
+                <a href="/about" class="nav-item">
+                    <span class="nav-icon">ℹ️</span>
+                    <span>ABOUT</span>
+                </a>
+                <a href="/team" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    <span>TEAM</span>
+                </a>
+                <a href="/contact" class="nav-item">
+                    <span class="nav-icon">📡</span>
+                    <span>CONTACT</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header>
+                <div class="mission-info">
+                    <h1>SYSTEM DIAGNOSTICS</h1>
+                    <p>HOST: RTX 4060 | BRAIN: ARDUINO MEGA</p>
+                </div>
+                <div class="status-bar">
+                    <span id="connection-status" class="status-indicator">🔴 Disconnected</span>
+                </div>
+            </header>
+
+            <div class="diagnostics-grid">
+                <!-- System Health Panel -->
+                <div class="panel">
+                    <h2>🏥 SYSTEM HEALTH</h2>
+                    <ul class="health-list">
+                        <li>SERIAL LINK: <span id="serial-health" class="hud-green">ONLINE</span></li>
+                        <li>VISION LATENCY: <span id="vision-latency">45ms</span></li>
+                        <li>AI ENGINE: <span class="hud-green">WAITING</span></li>
+                        <li>MEMORY: <span id="system-memory">12%</span></li>
+                    </ul>
+                    <div class="emergency-block" style="margin-top: 20px;">
+                        <button id="emergency-btn" class="btn btn-danger" style="width: 100%;">🛑 FORCE OVERRIDE
+                            STOP</button>
+                    </div>
+                </div>
+
+                <!-- Motor Calibration Panel -->
+                <div class="panel">
+                    <h2>🔧 MOTOR CALIBRATION</h2>
+                    <div class="motor-calibration-list">
+                        <!-- Motors 2-9 Sliders -->
+                        {% for i in range(2, 10) %}
+                        <div class="slider-group">
+                            <label>MOTOR ID {{ i }}: <span id="motor-{{ i }}-value">90</span>°</label>
+                            <input type="range" id="motor-{{ i }}" min="0" max="180" value="90" class="slider">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Persistent Speech Terminal -->
+            <div class="robot-speech-terminal">
+                <h3>🤖 SPEECH TERMINAL:</h3>
+                <div id="robot-speech" class="robot-speech-text">Diagnostics mode active. Scanning systems...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

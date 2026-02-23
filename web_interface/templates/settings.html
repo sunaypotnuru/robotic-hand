@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUNA - AI Settings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <div class="app-wrap">
+        <!-- Persistent Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">LUNA</div>
+            <nav class="nav-menu">
+                <a href="/" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>DASHBOARD</span>
+                </a>
+                <a href="/settings" class="nav-item active">
+                    <span class="nav-icon">⚙️</span>
+                    <span>AI SETTINGS</span>
+                </a>
+                <a href="/diagnostics" class="nav-item">
+                    <span class="nav-icon">🛠️</span>
+                    <span>DIAGNOSTICS</span>
+                </a>
+                <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+                <a href="/features" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>FEATURES</span>
+                </a>
+                <a href="/about" class="nav-item">
+                    <span class="nav-icon">ℹ️</span>
+                    <span>ABOUT</span>
+                </a>
+                <a href="/team" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    <span>TEAM</span>
+                </a>
+                <a href="/contact" class="nav-item">
+                    <span class="nav-icon">📡</span>
+                    <span>CONTACT</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header>
+                <div class="mission-info">
+                    <h1>AI CONFIGURATION</h1>
+                    <p>CORE: GEMINI 1.5 PRO | VISION: YOLOv8</p>
+                </div>
+                <div class="status-bar">
+                    <span id="connection-status" class="status-indicator">🔴 Disconnected</span>
+                </div>
+            </header>
+
+            <div class="settings-grid">
+                <!-- Vision Control Panel -->
+                <div class="panel">
+                    <h2>👁️ VISION SYSTEMS</h2>
+                    <div class="control-group">
+                        <div class="toggle-item">
+                            <span>OBJECT TRACKING (YOLOv8)</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-track">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="hint">Enables autonomous tracking of detected objects.</p>
+                    </div>
+
+                    <div class="control-group" style="margin-top: 20px;">
+                        <div class="toggle-item">
+                            <span>HAND MIMICRY (MediaPipe)</span>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-mimic">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <p class="hint">Maps hand skeletal landmarks to servo angles.</p>
+                    </div>
+                </div>
+
+                <!-- AI Personality Panel -->
+                <div class="panel">
+                    <h2>🧠 AI PERSONALITY</h2>
+                    <div class="input-group">
+                        <label>SYSTEM PROMPT / DIRECTIVE</label>
+                        <textarea id="ai-prompt" class="hud-input"
+                            placeholder="Enter robot directive (e.g., 'Sarcastic Assistant')"></textarea>
+                    </div>
+                    <button id="update-ai" class="btn btn-primary" style="margin-top: 15px; width: 100%;">APPLY
+                        DIRECTIVE</button>
+                    <p class="hint">Changes how Gemini interprets commands and responds.</p>
+                </div>
+            </div>
+
+            <!-- Persistent Speech Terminal -->
+            <div class="robot-speech-terminal">
+                <h3>🤖 SPEECH TERMINAL:</h3>
+                <div id="robot-speech" class="robot-speech-text">Configuration mode active...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUNA - {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <div class="app-wrap">
+        <!-- Persistent Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">LUNA</div>
+            <nav class="nav-menu">
+                <a href="{{ url_for('index') }}" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>DASHBOARD</span>
+                </a>
+                <a href="{{ url_for('settings') }}" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span>AI SETTINGS</span>
+                </a>
+                <a href="{{ url_for('diagnostics') }}" class="nav-item">
+                    <span class="nav-icon">🛠️</span>
+                    <span>DIAGNOSTICS</span>
+                </a>
+                <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+                <a href="{{ url_for('features') }}" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>FEATURES</span>
+                </a>
+                <a href="{{ url_for('about') }}" class="nav-item">
+                    <span class="nav-icon">ℹ️</span>
+                    <span>ABOUT</span>
+                </a>
+                <a href="{{ url_for('team') }}" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    <span>TEAM</span>
+                </a>
+                <a href="{{ url_for('contact') }}" class="nav-item">
+                    <span class="nav-icon">📡</span>
+                    <span>CONTACT</span>
+                </a>
+
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <div class="nav-divider" style="height: 1px; background: rgba(255, 0, 153, 0.2); margin: 10px 0;"></div>
+                <a href="/admin" class="nav-item admin-nav">
+                    <span class="nav-icon">🔐</span>
+                    <span>ADMIN PANEL</span>
+                </a>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-footer" style="padding: 20px; margin-top: auto;">
+                {% if current_user.is_authenticated %}
+                <div class="user-info" style="margin-bottom: 10px; font-size: 0.8rem; color: #00f3ff;">
+                    👤 {{ current_user.username }} [{{ current_user.role|upper }}]
+                </div>
+                <a href="{{ url_for('logout') }}" class="nav-item" style="color: #ff3e3e;">
+                    <span class="nav-icon">🚪</span>
+                    <span>LOGOUT</span>
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="nav-item">
+                    <span class="nav-icon">🔑</span>
+                    <span>LOGIN</span>
+                </a>
+                {% endif %}
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <div class="mission-info">
+                    <h1>{% block header_title %}MISSION CONTROL{% endblock %}</h1>
+                    <p>SYSTEM STATUS: <span id="system-mode">ACTIVE</span></p>
+                </div>
+                <div class="status-bar">
+                    <span id="connection-status" class="status-indicator">🔴 Disconnected</span>
+                    <span id="emergency-status" class="status-indicator hidden">🛑 EMERGENCY STOP</span>
+                </div>
+            </header>
+
+            <div class="content-body" style="padding: 30px; height: calc(100vh - 100px); overflow-y: auto;">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }}"
+                    style="margin-bottom: 20px; padding: 10px; border: 1px solid currentColor;">
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Team{% endblock %}
+
+{% block header_title %}TEAM INVICTA{% endblock %}
+
+{% block content %}
+<div class="team-container">
+    <div class="card-grid">
+        {% for member in members %}
+        <div class="hud-card team-card">
+            <h3>{{ member.name }}</h3>
+            <p class="role">{{ member.role }}</p>
+            <p>{{ member.bio }}</p>
+            <div class="social-links" style="margin-top: 15px;">
+                {% if member.github_url %}<a href="{{ member.github_url }}" class="social-link">GITHUB</a>{% endif %}
+                {% if member.linkedin_url %}<a href="{{ member.linkedin_url }}" class="social-link">LINKEDIN</a>{% endif
+                %}
+            </div>
+        </div>
+        {% else %}
+        <!-- Fallback if database is empty initially -->
+        <div class="hud-card">
+            <h3>Sunay</h3>
+            <p class="role">Computer Vision & AI Integration Specialist</p>
+            <p>Focusing on LUNA's "senses," Sunay oversees the implementation of the advanced AI tracking models.</p>
+        </div>
+        <div class="hud-card">
+            <h3>Rohith</h3>
+            <p class="role">Lead Systems Architect & Developer</p>
+            <p>Driving the core vision of Project LUNA, Rohith architects the central Flask backend.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="robot-speech-terminal">
+        <p id="robot-speech">🤖 LUNA: "Scanning biometric data... Team recognized. Welcome back, Commanders."</p>
+    </div>
+</div>
+
+<style>
+    .card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 30px;
+    }
+
+    .role {
+        color: #00f3ff;
+        font-size: 0.9rem;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+
+    .social-link {
+        font-size: 0.8rem;
+        color: #fff;
+        text-decoration: none;
+        padding: 5px 10px;
+        border: 1px solid rgba(0, 243, 255, 0.4);
+        margin-right: 10px;
+    }
+
+    .social-link:hover {
+        background: rgba(0, 243, 255, 0.1);
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block header_title %}NEW OPERATOR REGISTRATION{% endblock %}
+
+{% block content %}
+<div class="register-container" style="max-width: 450px; margin: 50px auto;">
+    <div class="hud-card register-card">
+        <h2 class="glitch-text">ENROLLMENT DATABASE</h2>
+        <p style="font-size: 0.8rem; color: #00f3ff; margin-bottom: 20px;">INTAKE_STATUS: OPEN | ENTER BIOMETRICS</p>
+
+        <form method="POST">
+            <div class="hud-input-group" style="margin-bottom: 20px;">
+                <label
+                    style="display: block; color: #00f3ff; margin-bottom: 5px; font-size: 0.8rem;">CHOOSE_OPERATOR_ID</label>
+                <input type="text" name="username" required
+                    style="width: 100%; background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.3); color: #fff; padding: 12px; outline: none;">
+            </div>
+            <div class="hud-input-group" style="margin-bottom: 20px;">
+                <label
+                    style="display: block; color: #00f3ff; margin-bottom: 5px; font-size: 0.8rem;">NEW_ENCRYPTION_KEY</label>
+                <input type="password" name="password" required
+                    style="width: 100%; background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.3); color: #fff; padding: 12px; outline: none;">
+            </div>
+            <div class="hud-input-group" style="margin-bottom: 30px;">
+                <label
+                    style="display: block; color: #00f3ff; margin-bottom: 5px; font-size: 0.8rem;">CONFIRM_KEY</label>
+                <input type="password" name="confirm_password" required
+                    style="width: 100%; background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.3); color: #fff; padding: 12px; outline: none;">
+            </div>
+
+            <button type="submit" class="btn-primary"
+                style="width: 100%; background: #00f3ff; color: #000; padding: 15px; border: none; font-weight: bold; cursor: pointer; letter-spacing: 2px;">
+                REQUEST INITIALIZATION
+            </button>
+        </form>
+
+        <div class="register-footer" style="margin-top: 25px; text-align: center; font-size: 0.85rem;">
+            <span style="color: rgba(255,255,255,0.5);">ALREADY_ENROLLED?</span>
+            <a href="{{ url_for('login') }}" style="color: #00f3ff; text-decoration: none; margin-left: 10px;">LOGIN</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .register-card {
+        border-top: 4px solid #00f3ff;
+    }
+
+    .glitch-text {
+        font-size: 1.5rem;
+        letter-spacing: 3px;
+        margin-bottom: 5px;
+    }
+</style>
+{% endblock %}
