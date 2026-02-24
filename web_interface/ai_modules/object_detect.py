@@ -6,6 +6,12 @@ YOLOv8 for Object Tracking and Click-to-Pick
 import cv2
 import numpy as np
 import threading
+import os
+
+# Resolve YOLO model path relative to this file's directory so the app
+# can be started from any working directory.
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_DEFAULT_MODEL = os.path.join(_BASE_DIR, '..', '..', 'yolov8n.pt')
 
 
 class ObjectDetector:
@@ -13,7 +19,9 @@ class ObjectDetector:
     YOLOv8 Object Detector for robotic arm control
     """
     
-    def __init__(self, model_path='yolov8n.pt', confidence_threshold=0.5):
+    def __init__(self, model_path=None, confidence_threshold=0.5):
+        if model_path is None:
+            model_path = _DEFAULT_MODEL
         """
         Initialize YOLOv8 detector
         

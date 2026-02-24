@@ -7,6 +7,8 @@ import threading
 import queue
 import json
 import os
+import io
+import tempfile
 from dotenv import load_dotenv
 import logging
 
@@ -231,7 +233,6 @@ class VoiceCommandProcessor:
             try:
                 text = None
                 if self.use_whisper and self.whisper_model:
-                    import tempfile
                     with self.microphone as source:
                         audio = self.speech_recognizer.listen(source, timeout=1, phrase_time_limit=4)
                     wav_data = io.BytesIO(audio.get_wav_data())

@@ -127,23 +127,31 @@ def load_user(user_id):
 
 # ==================== HELPERS ====================
 
-def log_mission(command_type, details):
-    """Log robotic actions to the database"""
+def log_mission(command_type, details, user_id=None):
+    """Log robotic actions to the database.
+    
+    Args:
+        command_type: Type of command (motor, batch, system, etc.)
+        details: Dict of command details to store as JSON.
+        user_id: Optional explicit user ID. If None, falls back to current
+                 request user, then first admin in DB.
+    """
     with app.app_context():
         try:
-            from flask import has_request_context
-            user_id = None
-            if has_request_context() and current_user.is_authenticated:
-                user_id = current_user.id
-            else:
-                # For background tasks or unauthenticated actions, use the first admin
-                system_user = User.query.filter_by(role='admin').first()
-                if system_user:
-                    user_id = system_user.id
+            resolved_id = user_id
+            if resolved_id is None:
+                from flask import has_request_context
+                if has_request_context() and current_user.is_authenticated:
+                    resolved_id = current_user.id
+                else:
+                    # Background thread fallback: use first admin
+                    system_user = User.query.filter_by(role='admin').first()
+                    if system_user:
+                        resolved_id = system_user.id
             
-            if user_id:
+            if resolved_id:
                 log = MissionLog(
-                    user_id=user_id,
+                    user_id=resolved_id,
                     command=command_type,
                     robot_state=details
                 )
@@ -866,25 +874,22 @@ def command_execution_loop():
     
     while True:
         try:
-            # 1. Smoothly follow target_motors
-            # This harmonizes absolute AI commands with the overall system
+            # 1. Smoothly follow target_motors — batch all changes per iteration
+            batch_moves = {}
             for motor_id, target in robot_state['target_motors'].items():
                 current = robot_state['motors'][motor_id]
                 if abs(current - target) > 0.5:
-                    # Move towards target at a constant speed (speed limit)
-                    # This prevents sudden jumps from AI commands
                     step = 2.0  # Max degrees per loop
-                    if target > current:
-                        new_pos = min(target, current + step)
-                    else:
-                        new_pos = max(target, current - step)
-                    
-                    send_motor_command(motor_id, new_pos)
+                    new_pos = min(target, current + step) if target > current else max(target, current - step)
+                    batch_moves[motor_id] = new_pos
+            if batch_moves:
+                send_batch_commands(batch_moves)
             
             # ========== VOICE/AI COMMAND HANDLING ==========
-            if voice_processor and not voice_processor.command_queue.empty():
-                command = voice_processor.get_command(timeout=0.1)
-                
+            # Use get() with a short timeout directly — avoids TOCTOU race
+            # on command_queue.empty() check.
+            if voice_processor:
+                command = voice_processor.get_command(timeout=0.05)
                 if command:
                     cmd_type = command.get('type')
                     print(f"🧠 Processing Command: {cmd_type}")
