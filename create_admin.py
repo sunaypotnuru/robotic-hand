@@ -11,7 +11,7 @@ def bootstrap():
         print("✅ Database tables created.")
 
         # 2. Create Admin User
-        admin_email = "sunaypotnuru@gmail.com"
+        admin_email = "sunaypotnutu@gmail.com"
         admin_user = User.query.filter_by(username=admin_email).first()
         if not admin_user:
             password = "surya1688*"

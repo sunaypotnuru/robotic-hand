@@ -24,14 +24,18 @@
             {{ member.role }}</h3>
         <p style="color: #ddd; line-height: 1.5; margin-bottom: 20px;">{{ member.bio }}</p>
 
-        <div class="member-links" style="display: flex; justify-content: center; gap: 15px;">
+        <div class="member-links" style="display: flex; justify-content: center; gap: 15px; margin-top: 15px;">
             {% if member.linkedin_url %}
-            <a href="{{ member.linkedin_url }}" target="_blank" title="LinkedIn"
-                style="font-size: 1.5rem; color: #00f3ff;">🔗</a>
+            <a href="{{ member.linkedin_url }}" target="_blank" class="btn btn-small"
+                style="color: #00f3ff; border-color: rgba(0,243,255,0.4); text-transform: uppercase;">
+                <span style="margin-right: 5px;">💼</span> LINKEDIN
+            </a>
             {% endif %}
             {% if member.github_url %}
-            <a href="{{ member.github_url }}" target="_blank" title="GitHub"
-                style="font-size: 1.5rem; color: #00f3ff;">🐙</a>
+            <a href="{{ member.github_url }}" target="_blank" class="btn btn-small"
+                style="color: #fff; border-color: rgba(255,255,255,0.4); text-transform: uppercase;">
+                <span style="margin-right: 5px;">🐙</span> GITHUB
+            </a>
             {% endif %}
         </div>
     </div>

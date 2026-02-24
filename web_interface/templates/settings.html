@@ -11,44 +11,11 @@
 
 <body>
     <div class="app-wrap">
-        <!-- Persistent Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-logo">LUNA</div>
-            <nav class="nav-menu">
-                <a href="/" class="nav-item">
-                    <span class="nav-icon">🎮</span>
-                    <span>DASHBOARD</span>
-                </a>
-                <a href="/settings" class="nav-item active">
-                    <span class="nav-icon">⚙️</span>
-                    <span>AI SETTINGS</span>
-                </a>
-                <a href="/diagnostics" class="nav-item">
-                    <span class="nav-icon">🛠️</span>
-                    <span>DIAGNOSTICS</span>
-                </a>
-                <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
-                <a href="/features" class="nav-item">
-                    <span class="nav-icon">📋</span>
-                    <span>FEATURES</span>
-                </a>
-                <a href="/about" class="nav-item">
-                    <span class="nav-icon">ℹ️</span>
-                    <span>ABOUT</span>
-                </a>
-                <a href="/team" class="nav-item">
-                    <span class="nav-icon">👥</span>
-                    <span>TEAM</span>
-                </a>
-                <a href="/contact" class="nav-item">
-                    <span class="nav-icon">📡</span>
-                    <span>CONTACT</span>
-                </a>
-            </nav>
-        </aside>
+        <!-- Shared Sidebar -->
+        {% include "sidebar.html" %}
 
         <!-- Main Content Area -->
-        <main class="main-content">
+        <main class="main-content with-sidebar">
             <header>
                 <div class="mission-info">
                     <h1>AI CONFIGURATION</h1>

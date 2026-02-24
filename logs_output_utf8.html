@@ -1,12 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LUNA - MISSIONS CONTROL</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=1.2">
-    <link rel="stylesheet" href="{{ url_for('static', filename='hud_styles.css') }}">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/hud_styles.css">
 
     <!-- Three.js Import Map -->
     <script type="importmap">
@@ -22,17 +22,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.1/dist/nipplejs.min.js"></script>
-    {% block head %}{% endblock %}
+    
 </head>
 
 <body>
-    <!-- Top Navigation Bar (Hidden on non-home pages) -->
-    <nav class="top-nav glass" id="top-nav" {% if request.endpoint !='index' %}style="display: none;" {% endif %}>
-        {% if not current_user.is_authenticated %}
-        <a href="/" class="nav-brand" style="text-decoration: none;">LUNA</a>
-        {% else %}
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav glass">
         <div class="nav-brand">LUNA</div>
-        {% endif %}
         <div class="nav-links" id="nav-links">
             <!-- Populated by JS -->
         </div>
@@ -40,9 +36,6 @@
             <!-- Populated by JS -->
         </div>
     </nav>
-
-    <!-- Shared Sidebar (Visible on non-home pages) -->
-    {% include "sidebar.html" %}
 
     <!-- Animation Overlay -->
     <div id="animation-overlay"
@@ -53,31 +46,11 @@
     </div>
 
     <!-- Main Content Area -->
-    <main id="main-content" class="main-content {% if request.endpoint != 'index' %}with-sidebar{% endif %}">
-
-        <!-- ==================== HOME SECTION ==================== -->
-        <div id="home-section" class="home-container" {% if request.endpoint=='index' %}
-            style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 80vh;"
-            {% else %}
-            style="display: none; flex-direction: column; justify-content: center; align-items: center; min-height: 80vh;"
-            {% endif %}>
-            <div id="front-lottie-container" style="width: 350px; height: 350px; margin-bottom: 20px;"></div>
-            <h1 class="glitch-text" style="font-size: 3.5rem; margin-bottom: 10px; text-align: center;">LUNA COMMAND
-            </h1>
-            <p
-                style="color: var(--neon-cyan); letter-spacing: 3px; margin-bottom: 15px; font-family: 'Orbitron', sans-serif;">
-                SECURE ROBOTIC INTERFACE</p>
-            <p style="color: #aaa; max-width: 600px; text-align: center; line-height: 1.6; margin-bottom: 40px;">
-                Project LUNA is an advanced 4-DOF robotic arm powered by Google Gemini AI and vision processing. It
-                enables secure, remote manipulation operations via localized digital-twin telemetry and voice control.
-            </p>
-            <button class="btn btn-primary btn-login"
-                style="padding: 15px 50px; font-size: 1.2rem; letter-spacing: 2px;">INITIATE UPLINK</button>
-        </div>
+    <main id="main-content" class="main-content">
 
         <!-- ==================== LOGIN SECTION ==================== -->
         <div id="login-section" class="login-container"
-            style="display: none; justify-content: center; align-items: center; min-height: 80vh;">
+            style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
             <div class="hud-form-container" style="width: 100%; max-width: 500px;">
                 <div class="hud-card auth-card panel">
                     <h2 class="glitch-text" style="text-align: center;">OPERATOR AUTHENTICATION</h2>
@@ -115,9 +88,9 @@
                     <p>SYSTEM STATUS: <span id="system-mode">ACTIVE</span></p>
                 </div>
                 <div class="status-bar">
-                    <span id="connection-status" class="status-indicator">🔴 Disconnected</span>
-                    <span id="gamepad-status" class="status-indicator">🎮 No Gamepad</span>
-                    <span id="emergency-status" class="status-indicator hidden">🛑 EMERGENCY STOP</span>
+                    <span id="connection-status" class="status-indicator">≡ƒö┤ Disconnected</span>
+                    <span id="gamepad-status" class="status-indicator">≡ƒÄ« No Gamepad</span>
+                    <span id="emergency-status" class="status-indicator hidden">≡ƒ¢æ EMERGENCY STOP</span>
                 </div>
             </header>
 
@@ -125,7 +98,7 @@
                 <div class="main-grid">
                     <!-- Left Panel: Telemetry -->
                     <div class="panel telemetry-panel">
-                        <h2>📊 TELEMETRY</h2>
+                        <h2>≡ƒôè TELEMETRY</h2>
                         <div class="sensor-values">
                             <div class="sensor-item">
                                 <span class="sensor-label">DISTANCE</span>
@@ -153,9 +126,9 @@
                     <!-- Center Panel: Video Feed & Digital Twin -->
                     <div class="panel center-panel">
                         <div class="video-section">
-                            <h2>📹 OPTICAL FEED</h2>
+                            <h2>≡ƒô╣ OPTICAL FEED</h2>
                             <div class="video-container">
-                                <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Camera Feed">
+                                <img id="video-feed" src="/video_feed" alt="Camera Feed">
                                 <div class="video-overlay">
                                     <div class="scanline"></div>
                                 </div>
@@ -166,7 +139,7 @@
 
                         <div class="digital-twin-section">
                             <div class="section-header">
-                                <h2>🤖 DIGITAL TWIN</h2>
+                                <h2>≡ƒñû DIGITAL TWIN</h2>
                                 <label class="switch">
                                     <input type="checkbox" id="toggle-3d" checked>
                                     <span class="toggle-slider round"></span>
@@ -185,14 +158,14 @@
 
                     <!-- Right Panel: Status & Actions -->
                     <div class="panel actions-panel">
-                        <h2>⚡ QUICK ACTIONS</h2>
+                        <h2>ΓÜí QUICK ACTIONS</h2>
                         <div class="action-grid">
-                            <button id="home-btn" class="btn btn-action">🏠 HOME ARMA</button>
-                            <button id="emergency-btn" class="btn btn-danger">🛑 OVERRIDE STOP</button>
+                            <button id="home-btn" class="btn btn-action">≡ƒÅá HOME ARMA</button>
+                            <button id="emergency-btn" class="btn btn-danger">≡ƒ¢æ OVERRIDE STOP</button>
                         </div>
 
                         <div class="joystick-section" style="margin-top: 20px;">
-                            <h3>🕹️ VIRTUAL LINK</h3>
+                            <h3>≡ƒò╣∩╕Å VIRTUAL LINK</h3>
                             <div id="joystick-zone"
                                 style="height: 150px; background: rgba(0,0,0,0.3); border-radius: 10px; border: 1px solid rgba(0, 243, 255, 0.2);">
                             </div>
@@ -200,7 +173,7 @@
                         </div>
 
                         <div class="voice-controls" style="margin-top: 20px;">
-                            <h3>🎤 VOICE LINK</h3>
+                            <h3>≡ƒÄñ VOICE LINK</h3>
                             <button id="start-voice" class="btn btn-primary">START UPLINK</button>
                             <div id="voice-status" class="voice-status">MODE: STANDBY</div>
                         </div>
@@ -208,37 +181,23 @@
                         <div
                             style="margin-top: 20px; padding: 10px; border: 1px solid rgba(0,243,255,0.15); border-radius: 5px;">
                             <span id="gamepad-status-right"
-                                style="font-size: 0.8rem; color: #aaa; letter-spacing: 1px;">🎮 GP-LINK STANDBY</span>
+                                style="font-size: 0.8rem; color: #aaa; letter-spacing: 1px;">≡ƒÄ« GP-LINK STANDBY</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Persistent Speech Terminal -->
                 <div class="robot-speech-terminal" style="margin-top: 20px;">
-                    <p id="robot-speech">🤖 LUNA: "Awaiting commands..."</p>
+                    <p id="robot-speech">≡ƒñû LUNA: "Awaiting commands..."</p>
                 </div>
             </div>
-        </div> <!-- Closes dashboard-section -->
-
-        <!-- ==================== AUXILIARY PAGES HEADER ==================== -->
-        {% if request.endpoint and request.endpoint != 'index' %}
-        <header style="margin-bottom: 30px;">
-            <div class="mission-info">
-                <h1 class="glitch-text">{% block header_title %}{% endblock %}</h1>
-            </div>
-            <div class="status-bar">
-                <span class="status-indicator">✅ UPLINK SECURE</span>
-            </div>
-        </header>
-        {% endif %}
-
-        {% block content %}{% endblock %}
+        </div>
     </main>
 
     <!-- Scripts -->
-    <script src="{{ url_for('static', filename='app.js') }}?v=1.1"></script>
-    <script type="module" src="{{ url_for('static', filename='script.js') }}?v=1.1"></script>
-    {% block scripts %}{% endblock %}
+    <script src="/static/app.js"></script>
+    <script type="module" src="/static/script.js"></script>
+    
 </body>
 
 </html>

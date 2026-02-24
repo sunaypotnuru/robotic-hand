@@ -53,6 +53,10 @@ if db_url.startswith("postgres://"):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Upload settings
 UPLOAD_FOLDER = os.path.join(app.root_path, 'web_interface', 'static', 'uploads')
@@ -119,7 +123,7 @@ class MissionLog(db.Model):
     command = db.Column(db.String(50), nullable=False)
     robot_state = db.Column(db.JSON, nullable=False)
 
-    user = db.relationship('User', backref='logs')
+    user = db.relationship('User', backref=db.backref('logs', cascade='all, delete-orphan'))
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -471,61 +475,69 @@ def generate_frames():
 
 # ==================== FLASK ROUTES ====================
 
-# ==================== AUTH ROUTES ====================
+# ==================== AUTH ROUTES (SPA API) ====================
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+@app.route('/api/auth-status', methods=['GET'])
+def auth_status():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            login_user(user)
-            next_page = request.args.get('next')
-            return redirect(next_page) if next_page else redirect(url_for('index'))
-        else:
-            flash('Invalid Operator ID or Encryption Key', 'danger')
-    return render_template('login.html')
+        return jsonify({
+            'authenticated': True,
+            'user': {
+                'username': current_user.username,
+                'role': current_user.role,
+                'full_name': current_user.full_name
+            }
+        })
+    else:
+        return jsonify({'authenticated': False})
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    user = User.query.filter_by(username=username).first()
+    
+    if user and user.check_password(password):
+        login_user(user)
+        return jsonify({
+            'success': True,
+            'user': {
+                'username': user.username,
+                'role': user.role,
+                'full_name': user.full_name
+            }
+        })
+    else:
+        return jsonify({'success': False, 'message': 'Invalid Operator ID or Encryption Key'}), 401
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    logout_user()
+    return jsonify({'success': True})
+
+# Legacy fallback routes redirect to SPA
+@app.route('/login', methods=['GET'])
+def login():
+    return redirect(url_for('index', **request.args))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        confirm = request.form['confirm_password']
-        if password != confirm:
-            flash('Encryption keys do not match.', 'danger')
-            return render_template('register.html')
-        if User.query.filter_by(username=username).first():
-            flash('Operator ID already active in database.', 'danger')
-            return render_template('register.html')
-        user = User(username=username)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        flash('Registration successful! Please establish uplink.', 'success')
-        return redirect(url_for('login'))
-    return render_template('register.html')
+    # Keep register page functional for now, or redirect to SPA if it has a register section
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    flash('Uplink terminated. Session closed.', 'info')
     return redirect(url_for('index'))
 
 # ==================== PUBLIC ROUTES ====================
 
 @app.route('/')
 def index():
-    """Public home or Mission Dashboard based on auth"""
-    if not current_user.is_authenticated:
-        return render_template('home.html')
-    return render_template('index.html')
+    """Single Page Application Root"""
+    return render_template('base.html')
 
 
 @app.route('/about')
@@ -1077,9 +1089,21 @@ def admin_user_delete(id):
     if user.id == current_user.id:
         flash('You cannot delete yourself.', 'danger')
         return redirect(url_for('admin_users'))
-    db.session.delete(user)
-    db.session.commit()
-    flash('User deleted.', 'success')
+    
+    # Explicitly iterate and delete all mission logs for this user to avoid SQLite/PgBouncer FK errors
+    try:
+        logs = MissionLog.query.filter_by(user_id=user.id).all()
+        for log in logs:
+            db.session.delete(log)
+        db.session.commit()
+        db.session.delete(user)
+        db.session.commit()
+        flash('User deleted.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"❌ User deletion failed: {e}")
+        flash(f'Database error during deletion.', 'danger')
+
     return redirect(url_for('admin_users'))
 
 @app.route('/admin/team')

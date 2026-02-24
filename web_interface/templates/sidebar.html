@@ -1,0 +1,68 @@
+<!-- Persistent Sidebar Component -->
+<aside class="sidebar" id="main-sidebar">
+    {% if not current_user.is_authenticated %}
+    <a href="/" class="sidebar-logo" style="text-decoration: none; display: block;">LUNA</a>
+    {% else %}
+    <div class="sidebar-logo">LUNA</div>
+    {% endif %}
+
+    <nav class="nav-menu">
+        {% if current_user.is_authenticated %}
+        <a href="/" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}" id="side-nav-home">
+            <span class="nav-icon">🎮</span>
+            <span>DASHBOARD</span>
+        </a>
+        <a href="/settings" class="nav-item {% if request.endpoint == 'settings' %}active{% endif %}"
+            id="side-nav-settings">
+            <span class="nav-icon">⚙️</span>
+            <span>AI SETTINGS</span>
+        </a>
+        <a href="/diagnostics" class="nav-item {% if request.endpoint == 'diagnostics' %}active{% endif %}"
+            id="side-nav-diagnostics">
+            <span class="nav-icon">🛠️</span>
+            <span>DIAGNOSTICS</span>
+        </a>
+        {% if current_user.role == 'admin' %}
+        <div class="nav-divider" style="height: 1px; background: rgba(255, 0, 153, 0.4); margin: 10px 0;"></div>
+        <a href="/admin"
+            class="nav-item {% if request.endpoint and request.endpoint.startswith('admin') %}active{% endif %}"
+            style="color: #ff0099; border-color: rgba(255, 0, 153, 0.3);">
+            <span class="nav-icon" style="text-shadow: 0 0 10px #ff0099;">👑</span>
+            <span style="letter-spacing: 2px; font-weight: bold; text-shadow: 0 0 5px #ff0099;">ADMIN PANEL</span>
+        </a>
+        {% endif %}
+        <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+        {% endif %}
+        <a href="/features" class="nav-item {% if request.endpoint == 'features' %}active{% endif %}">
+            <span class="nav-icon">📋</span>
+            <span>FEATURES</span>
+        </a>
+        <a href="/about" class="nav-item {% if request.endpoint == 'about' %}active{% endif %}">
+            <span class="nav-icon">ℹ️</span>
+            <span>ABOUT</span>
+        </a>
+        <a href="/team" class="nav-item {% if request.endpoint == 'team' %}active{% endif %}">
+            <span class="nav-icon">👥</span>
+            <span>TEAM</span>
+        </a>
+        <a href="/contact" class="nav-item {% if request.endpoint == 'contact' %}active{% endif %}">
+            <span class="nav-icon">📡</span>
+            <span>CONTACT</span>
+        </a>
+
+        {% if not current_user.is_authenticated %}
+        <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+        <a href="/?login=1" class="nav-item" style="color: #ff3e3e; border-color: rgba(255, 62, 62, 0.3);">
+            <span class="nav-icon">🔑</span>
+            <span style="letter-spacing: 2px; font-weight: bold;">OPERATOR LOGIN</span>
+        </a>
+        {% else %}
+        <div class="nav-divider" style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
+        <a href="#" onclick="logout(); return false;" class="nav-item"
+            style="color: #ff3e3e; border-color: rgba(255, 62, 62, 0.3);">
+            <span class="nav-icon">🛑</span>
+            <span style="letter-spacing: 2px; font-weight: bold;">OPERATOR LOGOUT</span>
+        </a>
+        {% endif %}
+    </nav>
+</aside>
