@@ -4,9 +4,10 @@ Advanced AI-powered 4-DOF robotic arm control system with web dashboard, compute
 
 ## System Architecture
 
-- **Host (Laptop)**: Flask web server with AI modules (YOLOv8, MediaPipe, Whisper)
+- **Host (Laptop)**: Flask web server with SQLAlchemy (Database), Socket.IO (Real-time), and AI modules (YOLOv8, MediaPipe, Whisper)
 - **Client (Arduino Mega)**: Motor control via PCA9685 drivers
 - **Hub (ESP32)**: Sensor telemetry (MPU6050, VL53L0X)
+- **Frontend**: Single Page Application (SPA) architecture with dynamic routing, Bootstrap 5 UI, and real-time dashboard
 
 ## Hardware Configuration
 
@@ -108,6 +109,22 @@ pip install -r requirements.txt
 ### 6. Quick Actions
 - **Home Position**: Move all motors to safe center position
 - **Emergency Stop**: Immediately stop all movement
+
+### 7. User Authentication & Roles
+- Secure login system (operator and admin levels)
+- **Operator**: Can control the arm and view their own logs
+- **Admin**: Has full access, can manage users, view all mission logs, and edit site content
+
+### 8. Admin Dashboard & Content Management
+- Dedicated admin portal (`/admin`) to manage the system
+- User management: Add, edit, or remove operators
+- Content management: Dynamically update About, Features, and Team pages without code changes
+- Global Mission Logs: Review all actions taken by all users
+
+### 9. Mission Logging & Telemetry
+- Every motor command and system event is logged to the database
+- Operators can review their personal mission history (`/logs`)
+- Real-time sensor telemetry displayed on the dashboard
 
 ## Safety Features
 
