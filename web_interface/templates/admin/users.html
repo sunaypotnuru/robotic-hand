@@ -3,6 +3,19 @@
 {% block title %}Manage Users{% endblock %}
 
 {% block header_title %}USER DIRECTORY{% endblock %}
+{% block back_button %}
+<div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+        style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+</div>
+{% endblock %}
+
+{% block dashboard_back_button %}
+<div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+        style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">

@@ -239,10 +239,6 @@ function initDigitalTwin() {
 
     // Load GLB Model
     // ----------------------------------------------------
-    // COMMENTED OUT to prevent 404 errors since luna_arm.glb is missing.
-    // Upload 'luna_arm.glb' to /static/models/ and uncomment to enable the 3D digital twin.
-    console.warn("⚠️ Digital Twin model disabled. Place 'luna_arm.glb' in /static/models/ and re-enable GLTFLoader in script.js to activate.");
-    /*
     const loader = new GLTFLoader();
     loader.load('/static/models/luna_arm.glb', (gltf) => {
         armModel = gltf.scene;
@@ -299,7 +295,6 @@ function initDigitalTwin() {
     }, undefined, (error) => {
         console.error("❌ GLB LOAD FAILED:", error);
     });
-    */
 
     animateDigitalTwin();
 

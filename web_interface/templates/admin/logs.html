@@ -3,6 +3,19 @@
 {% block title %}Mission Logs{% endblock %}
 
 {% block header_title %}MISSION LOG ARCHIVE{% endblock %}
+{% block back_button %}
+<div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+        style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+</div>
+{% endblock %}
+
+{% block dashboard_back_button %}
+<div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+        style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <div class="panel">

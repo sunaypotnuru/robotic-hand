@@ -12,6 +12,7 @@ void setup() {
   Serial.begin(115200);      // USB Debug
   MEGA_SERIAL.begin(115200); // Communication to Arduino
 
+  // Initialize I2C Bus first
     Wire.begin();
 
   // Try to initialize sensors

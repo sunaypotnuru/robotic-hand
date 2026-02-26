@@ -110,9 +110,18 @@
         <!-- ==================== DASHBOARD SECTION ==================== -->
         <div id="dashboard-section" style="display: none;">
             <header>
-                <div class="mission-info">
-                    <h1>LUNA MISSION CONTROL</h1>
-                    <p>SYSTEM STATUS: <span id="system-mode">ACTIVE</span></p>
+                <div class="mission-info" style="display: flex; align-items: center; gap: 20px;">
+                    {% if request.endpoint and request.endpoint.startswith('admin_') and request.endpoint !=
+                    'admin_dashboard' %}
+                    <div>
+                        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+                            style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <h1>LUNA MISSION CONTROL</h1>
+                        <p>SYSTEM STATUS: <span id="system-mode">ACTIVE</span></p>
+                    </div>
                 </div>
                 <div class="status-bar">
                     <span id="connection-status" class="status-indicator">🔴 Disconnected</span>
@@ -222,9 +231,11 @@
 
         <!-- ==================== AUXILIARY PAGES HEADER ==================== -->
         {% if request.endpoint and request.endpoint != 'index' %}
-        <header style="margin-bottom: 30px;">
-            <div class="mission-info">
-                <h1 class="glitch-text">{% block header_title %}{% endblock %}</h1>
+        <header style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="mission-info" style="display: flex; align-items: center; gap: 20px;">
+                {% block back_button %}{% endblock %}
+                <h1 class="glitch-text" style="margin: 0;" data-text="{{ self.header_title() }}">{% block header_title
+                    %}{% endblock %}</h1>
             </div>
             <div class="status-bar">
                 <span class="status-indicator">✅ UPLINK SECURE</span>

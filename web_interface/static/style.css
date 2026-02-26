@@ -32,7 +32,8 @@ body {
     color: var(--neon-cyan);
     min-height: 100vh;
     padding: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     position: relative;
     animation: grid-movement 100s linear infinite;
 }
@@ -357,7 +358,8 @@ header p {
         inset 0 0 30px rgba(0, 243, 255, 0.05);
     animation: slideInUp 0.8s ease-out, pageFadeIn 0.5s ease-out;
     position: relative;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     flex-shrink: 0;
     /* Prevents flex containers from squishing the panel vertically */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

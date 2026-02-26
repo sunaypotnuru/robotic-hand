@@ -1,0 +1,25 @@
+# Lightweight requirements (openai-whisper excluded)
+Flask==3.0.0
+flask-socketio==5.3.6
+python-socketio==5.10.0
+eventlet==0.33.3
+
+# Serial Communication
+pyserial==3.5
+
+# Computer Vision & AI (GPU Accelerated)
+opencv-python==4.8.1.78
+ultralytics==8.1.0
+mediapipe==0.10.8
+numpy==1.24.3
+psycopg2-binary==2.9.9
+
+# Voice Recognition & LLM
+google-generativeai==0.3.2
+SpeechRecognition==3.10.0
+PyAudio==0.2.13
+pyttsx3==2.90
+
+# Utilities
+python-dotenv==1.0.0
+Werkzeug==3.0.1

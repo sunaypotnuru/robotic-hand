@@ -162,7 +162,7 @@ def log_mission(command_type, details, user_id=None):
                 db.session.add(log)
                 db.session.commit()
         except Exception as e:
-            logger.error(f"⚠️  Mission log failed: {e}")
+            logger.error(f"[WARN] Mission log failed: {e}")
             db.session.rollback()
 
 def admin_required(f):
@@ -229,7 +229,7 @@ try:
     CV2_AVAILABLE = True
 except ImportError:
     CV2_AVAILABLE = False
-    logger.warning("⚠️  OpenCV not available - video feed will be disabled")
+    logger.warning("[WARN] OpenCV not available - video feed will be disabled")
 
 
 def find_arduino_port():
@@ -260,7 +260,7 @@ def init_serial_connection():
         SERIAL_PORT = find_arduino_port()
     
     if SERIAL_PORT is None:
-        logger.warning("⚠️  WARNING: No Arduino port detected. Running in simulation mode.")
+        logger.warning("[WARN] No Arduino port detected. Running in simulation mode.")
         robot_state['connected'] = False
         return False
     
@@ -273,10 +273,10 @@ def init_serial_connection():
         )
         time.sleep(2)  # Wait for Arduino to initialize
         robot_state['connected'] = True
-        logger.info(f"✅ Connected to Arduino on {SERIAL_PORT}")
+        logger.info(f"[OK] Connected to Arduino on {SERIAL_PORT}")
         return True
     except Exception as e:
-        logger.error(f"❌ Serial connection error: {e}")
+        logger.error(f"[ERROR] Serial connection error: {e}")
         robot_state['connected'] = False
         return False
 
@@ -288,12 +288,12 @@ def send_motor_command(motor_id, angle, force=False):
     """
     # Safety check: Block IDs 0 and 1
     if motor_id in [0, 1]:
-        print(f"⚠️  BLOCKED: Attempted to control removed motor ID {motor_id}")
+        print(f"[WARN] BLOCKED: Attempted to control removed motor ID {motor_id}")
         return False
     
     # Validate motor ID range
     if motor_id < 2 or motor_id > 9:
-        print(f"⚠️  INVALID: Motor ID {motor_id} out of range (2-9)")
+        print(f"[WARN] INVALID: Motor ID {motor_id} out of range (2-9)")
         return False
     
     # Validate angle range
@@ -301,7 +301,7 @@ def send_motor_command(motor_id, angle, force=False):
     
     # Emergency stop check
     if robot_state['emergency_stop'] and not force:
-        logger.warning("🛑 EMERGENCY STOP ACTIVE - Command blocked")
+        logger.warning("[STOP] EMERGENCY STOP ACTIVE - Command blocked")
         return False
     
     # Update state
@@ -326,7 +326,7 @@ def send_batch_commands(commands_dict):
         return False
     
     if robot_state['emergency_stop']:
-        logger.warning("🛑 EMERGENCY STOP ACTIVE - Batch command blocked")
+        logger.warning("[STOP] EMERGENCY STOP ACTIVE - Batch command blocked")
         return False
     
     # Build batch command
@@ -347,8 +347,7 @@ def send_batch_commands(commands_dict):
 
 def serial_writer_thread():
     """Background thread to process serial command queue"""
-    global arduino_serial
-    logger.info("🧵 Serial writer thread started")
+    logger.info("[THREAD] Serial writer thread started")
     
     while True:
         try:
@@ -356,14 +355,14 @@ def serial_writer_thread():
             if arduino_serial and arduino_serial.is_open:
                 with serial_lock:
                     arduino_serial.write(command.encode('utf-8'))
-                logger.debug(f"📤 Sent: {command.strip()}")
+                logger.debug(f"[OUT] Sent: {command.strip()}")
             else:
-                logger.debug(f"⚠️ Simulated: {command.strip()}")
+                logger.debug(f"[SIM] Simulated: {command.strip()}")
             serial_queue.task_done()
         except queue.Empty:
             continue
         except Exception as e:
-            logger.error(f"❌ Serial write error: {e}")
+            logger.error(f"[ERROR] Serial write error: {e}")
             time.sleep(0.1)
 
 
@@ -374,12 +373,11 @@ def emergency_stop():
     safe_commands = {2: 90, 3: 90, 4: 90}  # Center positions
     send_batch_commands(safe_commands)
     socketio.emit('emergency_stop', {'active': True})
-    logger.critical("🛑 EMERGENCY STOP ACTIVATED")
+    logger.critical("[STOP] EMERGENCY STOP ACTIVATED")
 
 
 def serial_reader_thread():
     """Background thread to read telemetry from Arduino"""
-    global arduino_serial
     
     while True:
         if arduino_serial and arduino_serial.is_open:
@@ -414,14 +412,14 @@ def serial_reader_thread():
                             socketio.emit('telemetry_update', robot_state['sensors'])
                             
                         except Exception as e:
-                            logger.warning(f"⚠️  Parse error: {e}")
+                            logger.warning(f"[WARN] Parse error: {e}")
                     
                     # Parse motor feedback
                     elif "Moving" in line:
-                        logger.debug(f"📥 Arduino: {line}")
+                        logger.debug(f"[IN] Arduino: {line}")
                         
             except Exception as e:
-                logger.error(f"❌ Serial read error: {e}")
+                logger.error(f"[ERROR] Serial read error: {e}")
                 time.sleep(0.1)
         else:
             time.sleep(1)
@@ -442,7 +440,7 @@ def generate_frames():
             camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             robot_state['camera_active'] = True
         except Exception as e:
-            logger.error(f"❌ Camera error: {e}")
+            logger.error(f"[ERROR] Camera error: {e}")
             return
     
     # Initialize AI modules if needed
@@ -627,7 +625,7 @@ def set_motor():
 @socketio.on('connect')
 def handle_connect():
     """Client connected"""
-    print("🔌 Client connected")
+    print(">>> Client connected")
     emit('state_update', robot_state)
     emit('connection_status', {'connected': robot_state['connected']})
 
@@ -635,7 +633,7 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     """Client disconnected"""
-    print("🔌 Client disconnected")
+    print("<<< Client disconnected")
 
 
 @socketio.on('motor_command')
@@ -709,7 +707,7 @@ def handle_object_click(data):
     obj_y = data.get('y', 0.5)
     
     # Convert Y position to pivot angle
-    # Top of frame (y=0) = 0°, Bottom (y=1) = 180°
+    # Top of frame (y=0) = 0, Bottom (y=1) = 180 (degrees)
     target_angle = obj_y * 180
     target_angle = max(0, min(180, target_angle))
     
@@ -744,7 +742,7 @@ def handle_voice_command(data):
         for motor_id, angle in targets.items():
             if 2 <= int(motor_id) <= 9:
                 robot_state['target_motors'][int(motor_id)] = angle
-        logger.info(f"🎤 Voice Targets: {targets}")
+        logger.info(f"[VOICE] Voice Targets: {targets}")
     
     socketio.emit('state_update', robot_state)
 
@@ -788,7 +786,7 @@ def handle_toggle_track_mode(data):
     global track_mode_enabled
     track_mode_enabled = data.get('enable', False)
     socketio.emit('track_mode_status', {'enabled': track_mode_enabled})
-    logger.info(f"🎯 Track mode: {'ON' if track_mode_enabled else 'OFF'}")
+    logger.info(f"[TRACK] Track mode: {'ON' if track_mode_enabled else 'OFF'}")
 
 
 @socketio.on('toggle_mimic_mode')
@@ -797,7 +795,7 @@ def handle_toggle_mimic_mode(data):
     global mimic_mode_enabled
     mimic_mode_enabled = data.get('enable', False)
     socketio.emit('mimic_mode_status', {'enabled': mimic_mode_enabled})
-    logger.info(f"👋 Mimic mode: {'ON' if mimic_mode_enabled else 'OFF'}")
+    logger.info(f"[MIMIC] Mimic mode: {'ON' if mimic_mode_enabled else 'OFF'}")
 
 
 @socketio.on('gamepad_data')
@@ -806,7 +804,6 @@ def handle_gamepad_data(data):
     Handle gamepad input from frontend (Anti-Gravity Velocity Control)
     Moves motors smoothly by adding/subtracting from current position based on stick pressure.
     """
-    global voice_processor
     
     if robot_state['emergency_stop']:
         return
@@ -880,13 +877,11 @@ def command_execution_loop():
     """
     Main command execution loop - processes AI-generated commands (Gemini + others)
     """
-    global object_detector, hand_tracker, voice_processor, kinematics
-    global track_mode_enabled, mimic_mode_enabled
     
     
     while True:
         try:
-            # 1. Smoothly follow target_motors — batch all changes per iteration
+            # 1. Smoothly follow target_motors -- batch all changes per iteration
             batch_moves = {}
             for motor_id, target in robot_state['target_motors'].items():
                 current = robot_state['motors'][motor_id]
@@ -898,13 +893,13 @@ def command_execution_loop():
                 send_batch_commands(batch_moves)
             
             # ========== VOICE/AI COMMAND HANDLING ==========
-            # Use get() with a short timeout directly — avoids TOCTOU race
+            # Use get() with a short timeout directly -- avoids TOCTOU race
             # on command_queue.empty() check.
             if voice_processor:
                 command = voice_processor.get_command(timeout=0.05)
                 if command:
                     cmd_type = command.get('type')
-                    print(f"🧠 Processing Command: {cmd_type}")
+                    print(f"[BRAIN] Processing Command: {cmd_type}")
 
                     # --- GEMINI INTELLIGENT COMMANDS ---
                     if cmd_type == 'gemini_command':
@@ -971,7 +966,7 @@ def command_execution_loop():
                     current_angle = robot_state['motors'][2]
                     if abs(current_angle - target_angle) > 2:  # Deadband
                         send_motor_command(2, target_angle)
-                        print(f"🎯 Tracking: Moving pivot to {target_angle}°")
+                        print(f"[TRACK] Tracking: Moving pivot to {target_angle} deg")
                         
                         # TTS feedback (throttled to avoid spam)
                         if not hasattr(command_execution_loop, 'last_track_speech') or \
@@ -1005,7 +1000,7 @@ def command_execution_loop():
             time.sleep(0.05)
             
         except Exception as e:
-            print(f"⚠️  Command execution error: {e}")
+            print(f"[ERROR] Command execution error: {e}")
             time.sleep(0.1)
 
 
@@ -1101,7 +1096,7 @@ def admin_user_delete(id):
         flash('User deleted.', 'success')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"❌ User deletion failed: {e}")
+        logger.error(f"[ERROR] User deletion failed: {e}")
         flash(f'Database error during deletion.', 'danger')
 
     return redirect(url_for('admin_users'))
@@ -1261,37 +1256,37 @@ def init_ai_modules():
     """Initialize AI modules in background"""
     global object_detector, hand_tracker, voice_processor
     
-    logger.info("🤖 Initializing AI modules...")
+    logger.info("[AI] Initializing AI modules...")
     
     try:
         object_detector = ObjectDetector()
-        logger.info("✅ Object Detector ready")
+        logger.info("[OK] Object Detector ready")
     except Exception as e:
-        logger.error(f"⚠️  Object Detector error: {e}")
+        logger.error(f"[WARN] Object Detector error: {e}")
     
     try:
         hand_tracker = HandTracker()
-        logger.info("✅ Hand Tracker ready")
+        logger.info("[OK] Hand Tracker ready")
     except Exception as e:
-        logger.error(f"⚠️  Hand Tracker error: {e}")
+        logger.error(f"[WARN] Hand Tracker error: {e}")
     
     try:
         voice_processor = VoiceCommandProcessor()
-        logger.info("✅ Voice Processor ready")
+        logger.info("[OK] Voice Processor ready")
     except Exception as e:
-        logger.error(f"⚠️  Voice Processor error: {e}")
+        logger.error(f"[WARN] Voice Processor error: {e}")
 
 
 if __name__ == '__main__':
     print("=" * 50)
-    print("🚀 LUNA Robotic Arm - Starting System")
+    print("[START] LUNA Robotic Arm - Starting System")
     # Initialize Database
     with app.app_context():
         try:
             db.create_all()
-            logger.info("🗄️ Database tables verified/created")
+            logger.info("[DB] Database tables verified/created")
         except Exception as e:
-            logger.error(f"❌ Database initialization failed: {e}")
+            logger.error(f"[ERROR] Database initialization failed: {e}")
 
     # Initialize serial connection
     init_serial_connection()
@@ -1299,13 +1294,13 @@ if __name__ == '__main__':
     # Start serial writer thread
     writer_thread = threading.Thread(target=serial_writer_thread, daemon=True)
     writer_thread.start()
-    logger.info("✅ Serial writer thread started")
+    logger.info("[OK] Serial writer thread started")
     
     # Start serial reader thread
     if robot_state['connected']:
         serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
         serial_thread.start()
-        logger.info("✅ Serial reader thread started")
+        logger.info("[OK] Serial reader thread started")
     
     # Initialize AI modules (non-blocking)
     ai_thread = threading.Thread(target=init_ai_modules, daemon=True)
@@ -1317,16 +1312,16 @@ if __name__ == '__main__':
     # Start command execution loop (the "brain")
     command_thread = threading.Thread(target=command_execution_loop, daemon=True)
     command_thread.start()
-    logger.info("✅ Command execution loop started")
+    logger.info("[OK] Command execution loop started")
     
     # Move to home position
     time.sleep(1)
     home_position()
     
-    print("\n🌐 Starting Flask server on http://localhost:5000")
-    print("📹 Video feed: http://localhost:5000/video_feed")
-    print("\n⚠️  Press Ctrl+C to stop\n")
+    print("\n[WEB] Starting Flask server on http://localhost:5000")
+    print("[VIDEO] Video feed: http://localhost:5000/video_feed")
+    print("\n[INFO] Press Ctrl+C to stop\n")
     
     # Run Flask app
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=True, allow_unsafe_werkzeug=True)
 
