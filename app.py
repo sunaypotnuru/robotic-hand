@@ -1,3 +1,4 @@
+from typing import Dict, Optional, List, Tuple, Union, Any
 import os
 import sys
 import threading
@@ -11,6 +12,9 @@ from flask import Flask, render_template, Response, jsonify, request, redirect, 
 from flask_socketio import SocketIO, emit
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
@@ -32,6 +36,8 @@ from ai_modules.object_detect import ObjectDetector
 from ai_modules.hand_tracking import HandTracker
 from ai_modules.voice_cmd import VoiceCommandProcessor
 from ai_modules.kinematics import SimpleKinematics
+from ai_modules.motion_recorder import MotionRecorder
+from utils.validators import InputValidator
 
 # Initialize Flask App
 app = Flask(__name__, 
@@ -74,6 +80,46 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message_category = 'info'
+
+# Initialize Rate Limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# Initialize Security Headers (Talisman)
+csp = {
+    'default-src': "'self'",
+    'script-src': [
+        "'self'",
+        "'unsafe-inline'",  # Required for inline scripts
+        'cdn.socket.io',
+        'cdn.jsdelivr.net',
+        'cdnjs.cloudflare.com',
+        'unpkg.com'
+    ],
+    'style-src': [
+        "'self'",
+        "'unsafe-inline'",
+        'fonts.googleapis.com'
+    ],
+    'font-src': [
+        "'self'",
+        'fonts.gstatic.com'
+    ],
+    'img-src': "'self' data: blob:",
+    'connect-src': "'self' ws: wss: https://assets2.lottiefiles.com https://assets3.lottiefiles.com https://lottie.host"
+}
+
+Talisman(app,
+    content_security_policy=csp,
+    force_https=False,  # Set True in production
+    strict_transport_security=True,
+    session_cookie_secure=False,  # Set True in production with HTTPS
+    session_cookie_samesite='Lax'
+)
 
 # ==================== DATABASE MODELS ====================
 
@@ -131,14 +177,15 @@ def load_user(user_id):
 
 # ==================== HELPERS ====================
 
-def log_mission(command_type, details, user_id=None):
-    """Log robotic actions to the database.
+def log_mission(command_type: str, details: Dict[str, Any], user_id: Optional[int] = None) -> None:
+    """
+    Log robotic actions to the database.
     
     Args:
         command_type: Type of command (motor, batch, system, etc.)
-        details: Dict of command details to store as JSON.
+        details: Dict of command details to store as JSON
         user_id: Optional explicit user ID. If None, falls back to current
-                 request user, then first admin in DB.
+                 request user, then first admin in DB
     """
     with app.app_context():
         try:
@@ -213,6 +260,7 @@ object_detector = None
 hand_tracker = None
 voice_processor = None
 kinematics = SimpleKinematics(link_length=28.0)  # 28cm forearm
+motion_recorder = MotionRecorder()  # Motion recording system
 
 # Configuration
 SERIAL_PORT = config.SERIAL_PORT
@@ -281,10 +329,19 @@ def init_serial_connection():
         return False
 
 
-def send_motor_command(motor_id, angle, force=False):
+def send_motor_command(motor_id: int, angle: int, force: bool = False) -> bool:
     """
-    Send motor command to Arduino
-    CRITICAL: Never send commands to ID 0 or 1 (removed shoulder)
+    Send motor command to Arduino with validation.
+    
+    CRITICAL: Never send commands to ID 0 or 1 (removed shoulder motors).
+    
+    Args:
+        motor_id: Motor ID (2-9 valid range)
+        angle: Target angle in degrees (0-180)
+        force: Override emergency stop if True
+    
+    Returns:
+        True if command sent successfully, False otherwise
     """
     # Safety check: Block IDs 0 and 1
     if motor_id in [0, 1]:
@@ -307,6 +364,9 @@ def send_motor_command(motor_id, angle, force=False):
     # Update state
     robot_state['motors'][motor_id] = angle
     
+    # Record frame if recording
+    motion_recorder.record_frame(robot_state['motors'])
+    
     # Add to serial queue
     command = f"M:{motor_id}:{angle}\n"
     serial_queue.put(command)
@@ -317,8 +377,17 @@ def send_motor_command(motor_id, angle, force=False):
     return True
 
 
-def send_batch_commands(commands_dict):
-    """Send multiple motor commands in batch format: B:ID:ANGLE:ID:ANGLE..."""
+def send_batch_commands(commands_dict: Dict[int, int]) -> bool:
+    """
+    Send multiple motor commands in batch format: B:ID:ANGLE:ID:ANGLE...
+    
+    Args:
+        commands_dict: Dictionary mapping motor IDs to angles
+                      Example: {2: 90, 3: 45, 4: 135}
+    
+    Returns:
+        True if batch sent successfully, False otherwise
+    """
     # Filter out IDs 0 and 1
     valid_commands = {k: v for k, v in commands_dict.items() if k not in [0, 1] and 2 <= k <= 9}
     
@@ -366,14 +435,31 @@ def serial_writer_thread():
             time.sleep(0.1)
 
 
-def emergency_stop():
-    """Trigger emergency stop"""
+def emergency_stop() -> None:
+    """
+    Trigger emergency stop - move ALL motors to safe position.
+    
+    Sets emergency_stop flag and moves:
+    - Motors 2-4 to center position (90°)
+    - Motors 5-9 to open position (0°)
+    
+    Emits 'emergency_stop' event to all connected clients.
+    """
     robot_state['emergency_stop'] = True
     # Send emergency stop to all motors (set to safe position)
-    safe_commands = {2: 90, 3: 90, 4: 90}  # Center positions
+    safe_commands = {
+        2: 90,   # Main Pivot: Center
+        3: 90,   # Wrist Pitch: Center
+        4: 90,   # Wrist Roll: Center
+        5: 0,    # Fingers: Open (safe position)
+        6: 0,
+        7: 0,
+        8: 0,
+        9: 0,
+    }
     send_batch_commands(safe_commands)
     socketio.emit('emergency_stop', {'active': True})
-    logger.critical("[STOP] EMERGENCY STOP ACTIVATED")
+    logger.critical("[STOP] EMERGENCY STOP ACTIVATED - All motors to safe position")
 
 
 def serial_reader_thread():
@@ -432,16 +518,18 @@ def generate_frames():
     if not CV2_AVAILABLE:
         return
     
-    # Initialize camera
+    # Initialize camera with thread safety (double-check locking pattern)
     if camera is None:
-        try:
-            camera = cv2.VideoCapture(0)
-            camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            robot_state['camera_active'] = True
-        except Exception as e:
-            logger.error(f"[ERROR] Camera error: {e}")
-            return
+        with camera_lock:
+            if camera is None:  # Double-check inside lock
+                try:
+                    camera = cv2.VideoCapture(0)
+                    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    robot_state['camera_active'] = True
+                except Exception as e:
+                    logger.error(f"[ERROR] Camera error: {e}")
+                    return
     
     # Initialize AI modules if needed
     if object_detector is None:
@@ -490,6 +578,7 @@ def auth_status():
         return jsonify({'authenticated': False})
 
 @app.route('/api/login', methods=['POST'])
+@limiter.limit("5 per minute")  # Prevent brute force attacks
 def api_login():
     data = request.get_json()
     username = data.get('username')
@@ -498,6 +587,7 @@ def api_login():
     
     if user and user.check_password(password):
         login_user(user)
+        logger.info(f"[AUTH] Successful login: {username}")
         return jsonify({
             'success': True,
             'user': {
@@ -507,6 +597,7 @@ def api_login():
             }
         })
     else:
+        logger.warning(f"[AUTH] Failed login attempt: {username}")
         return jsonify({'success': False, 'message': 'Invalid Operator ID or Encryption Key'}), 401
 
 @app.route('/api/logout', methods=['POST'])
@@ -637,9 +728,17 @@ def handle_disconnect():
 
 
 @socketio.on('motor_command')
+@limiter.limit("100 per minute")  # Prevent command spam
 def handle_motor_command(data):
-    """Handle motor command from client"""
+    """Handle motor command from client with validation"""
     if not current_user.is_authenticated:
+        return
+    
+    # Validate input
+    try:
+        InputValidator.validate_motor_command(data)
+    except Exception as e:
+        emit('command_error', {'error': str(e)})
         return
         
     motor_id = data.get('motor_id')
@@ -656,7 +755,14 @@ def handle_motor_command(data):
 
 @socketio.on('batch_command')
 def handle_batch_command(data):
-    """Handle batch motor commands"""
+    """Handle batch motor commands with validation"""
+    # Validate input
+    try:
+        InputValidator.validate_batch_command(data)
+    except Exception as e:
+        emit('command_error', {'error': str(e)})
+        return
+    
     commands = data.get('commands', {})
     success = send_batch_commands(commands)
     emit('command_response', {'success': success, 'type': 'batch'})
@@ -665,8 +771,15 @@ def handle_batch_command(data):
 
 @socketio.on('joystick_move')
 def handle_joystick(data):
-    """Handle virtual joystick input (velocity control)"""
+    """Handle virtual joystick input (velocity control) with validation"""
     if not current_user.is_authenticated:
+        return
+    
+    # Validate input
+    try:
+        InputValidator.validate_joystick_input(data)
+    except Exception as e:
+        emit('command_error', {'error': str(e)})
         return
         
     x = data.get('x', 0.0)  # -1.0 to 1.0
@@ -798,14 +911,161 @@ def handle_toggle_mimic_mode(data):
     logger.info(f"[MIMIC] Mimic mode: {'ON' if mimic_mode_enabled else 'OFF'}")
 
 
+# ==================== MOTION RECORDING EVENTS ====================
+
+@socketio.on('start_recording')
+def handle_start_recording():
+    """Start recording motor movements"""
+    if not current_user.is_authenticated:
+        return
+    
+    motion_recorder.start_recording()
+    emit('recording_status', {'recording': True, 'message': 'Recording started'})
+    logger.info("[RECORDER] Recording started by user")
+
+
+@socketio.on('stop_recording')
+def handle_stop_recording(data):
+    """Stop recording and save sequence with validation"""
+    if not current_user.is_authenticated:
+        return
+    
+    sequence = motion_recorder.stop_recording()
+    name = data.get('name', f'sequence_{int(time.time())}')
+    
+    # Validate recording name
+    try:
+        InputValidator.validate_recording_name(name)
+    except Exception as e:
+        emit('recording_saved', {'success': False, 'error': str(e)})
+        return
+    
+    try:
+        filepath = motion_recorder.save_sequence(name)
+        emit('recording_saved', {
+            'success': True,
+            'name': name,
+            'frames': len(sequence),
+            'filepath': filepath
+        })
+        logger.info(f"[RECORDER] Sequence saved: {name} ({len(sequence)} frames)")
+    except Exception as e:
+        emit('recording_saved', {
+            'success': False,
+            'error': str(e)
+        })
+        logger.error(f"[RECORDER] Save failed: {e}")
+
+
+@socketio.on('list_recordings')
+def handle_list_recordings():
+    """List all available recordings"""
+    if not current_user.is_authenticated:
+        return
+    
+    recordings = motion_recorder.list_recordings()
+    emit('recordings_list', {'recordings': recordings})
+
+
+@socketio.on('playback_sequence')
+def handle_playback_sequence(data):
+    """Play back a recorded sequence with validation"""
+    if not current_user.is_authenticated:
+        return
+    
+    filename = data.get('filename')
+    if not filename:
+        emit('playback_status', {'success': False, 'error': 'No filename provided'})
+        return
+    
+    # Validate filename
+    try:
+        InputValidator.validate_filename(filename)
+    except Exception as e:
+        emit('playback_status', {'success': False, 'error': str(e)})
+        return
+    
+    try:
+        sequence_data = motion_recorder.load_sequence(filename)
+        # Start playback in separate thread
+        threading.Thread(
+            target=playback_sequence_thread,
+            args=(sequence_data['sequence'],),
+            daemon=True
+        ).start()
+        
+        emit('playback_status', {
+            'success': True,
+            'message': f"Playing back: {sequence_data['name']}"
+        })
+    except Exception as e:
+        emit('playback_status', {'success': False, 'error': str(e)})
+        logger.error(f"[RECORDER] Playback failed: {e}")
+
+
+@socketio.on('delete_recording')
+def handle_delete_recording(data):
+    """Delete a recording with validation (admin only)"""
+    if not current_user.is_authenticated or current_user.role != 'admin':
+        emit('delete_status', {'success': False, 'error': 'Admin access required'})
+        return
+    
+    filename = data.get('filename')
+    if not filename:
+        emit('delete_status', {'success': False, 'error': 'No filename provided'})
+        return
+    
+    # Validate filename
+    try:
+        InputValidator.validate_filename(filename)
+    except Exception as e:
+        emit('delete_status', {'success': False, 'error': str(e)})
+        return
+    
+    success = motion_recorder.delete_recording(filename)
+    emit('delete_status', {'success': success, 'filename': filename})
+
+
+def playback_sequence_thread(sequence: List[Dict]):
+    """
+    Play back a recorded sequence in a background thread.
+    
+    Args:
+        sequence: List of frames with timestamps and motor positions
+    """
+    logger.info(f"[PLAYBACK] Starting playback of {len(sequence)} frames")
+    
+    start_time = time.time()
+    for frame in sequence:
+        target_time = frame['timestamp']
+        motors = frame['motors']
+        
+        # Wait until the correct time
+        while (time.time() - start_time) < target_time:
+            time.sleep(0.01)
+        
+        # Send batch command
+        send_batch_commands(motors)
+    
+    logger.info("[PLAYBACK] Playback complete")
+    socketio.emit('playback_complete', {'message': 'Playback finished'})
+
+
 @socketio.on('gamepad_data')
 def handle_gamepad_data(data):
     """
-    Handle gamepad input from frontend (Anti-Gravity Velocity Control)
+    Handle gamepad input from frontend with validation (Anti-Gravity Velocity Control)
     Moves motors smoothly by adding/subtracting from current position based on stick pressure.
     """
     
     if robot_state['emergency_stop']:
+        return
+    
+    # Validate gamepad input
+    try:
+        InputValidator.validate_gamepad_input(data)
+    except Exception as e:
+        emit('command_error', {'error': str(e)})
         return
     
     # Extract gamepad values
@@ -1004,8 +1264,14 @@ def command_execution_loop():
             time.sleep(0.1)
 
 
-def home_position():
-    """Move all motors to safe home position"""
+def home_position() -> None:
+    """
+    Move all motors to safe home position.
+    
+    Home position:
+    - Motors 2-4: Center (90°)
+    - Motors 5-9: Open (0°)
+    """
     home_commands = {
         2: 90,   # Main Pivot: Center
         3: 90,   # Wrist Pitch: Center

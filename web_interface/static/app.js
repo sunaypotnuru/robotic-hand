@@ -35,22 +35,39 @@ async function checkAuth() {
             const urlParams = new URLSearchParams(window.location.search);
             const nextParam = urlParams.get('next');
             if (nextParam && window.location.pathname === '/') {
-                window.location.href = nextParam;
+                if (topNav) topNav.style.display = 'none';
+                if (mainSidebar) mainSidebar.style.display = 'flex';
+                if (mainContent) mainContent.classList.add('with-sidebar');
+                
+                const page = nextParam.substring(1) || 'dashboard';
+                if (window.router) {
+                    window.router.showPage(page, false);
+                } else {
+                    window.location.href = nextParam;
+                }
+                updateNavForUser(data.user);
                 return;
             }
 
             if (window.location.pathname === '/') {
-                if (dashboardSection) dashboardSection.style.display = 'block';
                 if (topNav) topNav.style.display = 'none';
                 if (mainSidebar) mainSidebar.style.display = 'flex';
                 if (mainContent) mainContent.classList.add('with-sidebar');
-
-                // Set sidebar home link active
-                document.querySelectorAll('#main-sidebar .nav-item').forEach(item => item.classList.remove('active'));
-                const homeLink = document.getElementById('side-nav-home');
-                if (homeLink) homeLink.classList.add('active');
+                
+                if (window.router) {
+                    window.router.showPage('dashboard', false);
+                } else {
+                    if (dashboardSection) dashboardSection.style.display = 'block';
+                }
             } else {
-                if (dashboardSection) dashboardSection.style.display = 'none';
+                if (topNav) topNav.style.display = 'none';
+                if (mainSidebar) mainSidebar.style.display = 'flex';
+                if (mainContent) mainContent.classList.add('with-sidebar');
+                
+                const path = window.location.pathname.substring(1) || 'dashboard';
+                if (window.router) {
+                    window.router.showPage(path, false);
+                }
             }
             updateNavForUser(data.user);
         } else {
@@ -116,22 +133,26 @@ function showDashboardWithAnimation(user) {
 
         const urlParams = new URLSearchParams(window.location.search);
         const nextParam = urlParams.get('next');
+        
+        if (topNav) topNav.style.display = 'none';
+        if (mainSidebar) mainSidebar.style.display = 'flex';
+        if (mainContent) mainContent.classList.add('with-sidebar');
+        
         if (nextParam) {
-            window.location.href = nextParam;
-            return;
+            const page = nextParam.substring(1) || 'dashboard';
+            if (window.router) {
+                window.router.showPage(page);
+            } else {
+                window.location.href = nextParam;
+            }
+        } else {
+            if (window.router) {
+                window.router.showPage('dashboard');
+            } else {
+                if (dashboardSection) dashboardSection.style.display = 'block';
+            }
         }
-
-        if (window.location.pathname === '/') {
-            if (dashboardSection) dashboardSection.style.display = 'block';
-            if (topNav) topNav.style.display = 'none';
-            if (mainSidebar) mainSidebar.style.display = 'flex';
-            if (mainContent) mainContent.classList.add('with-sidebar');
-
-            // Set sidebar home link active
-            document.querySelectorAll('#main-sidebar .nav-item').forEach(item => item.classList.remove('active'));
-            const homeLink = document.getElementById('side-nav-home');
-            if (homeLink) homeLink.classList.add('active');
-        }
+        
         updateNavForUser(user);
     });
 }
@@ -210,7 +231,33 @@ function updateNavForUser(user) {
         <span class="user-name">👤 ${user.full_name || user.username} [${user.role.toUpperCase()}]</span>
         <button class="btn-logout" onclick="logout()">LOGOUT</button>
     `;
+    
+    if (window.setActiveNavLink) {
+        window.setActiveNavLink();
+    }
 }
+
+// Function to update active navigation link based on current path
+window.setActiveNavLink = function() {
+    const currentPath = window.location.pathname;
+    
+    // Update main sidebar links
+    document.querySelectorAll('.nav-link, .nav-item').forEach(link => {
+        const href = link.getAttribute('href');
+        if (!href) return;
+        
+        if (href === currentPath || (currentPath === '/' && href === '/')) {
+            link.classList.add('active');
+        } else {
+            // For root path, don't match partially
+            if (href !== '/' && currentPath.startsWith(href)) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        }
+    });
+};
 
 // AJAX login
 async function login(username, password) {

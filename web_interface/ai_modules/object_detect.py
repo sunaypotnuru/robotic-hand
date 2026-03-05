@@ -11,7 +11,7 @@ import os
 # Resolve YOLO model path relative to this file's directory so the app
 # can be started from any working directory.
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_MODEL = os.path.join(_BASE_DIR, '..', '..', 'yolov8n.pt')
+_DEFAULT_MODEL = os.path.join(_BASE_DIR, '..', '..', 'models', 'yolov8m.pt')
 
 
 class ObjectDetector:
@@ -20,8 +20,6 @@ class ObjectDetector:
     """
     
     def __init__(self, model_path=None, confidence_threshold=0.5):
-        if model_path is None:
-            model_path = _DEFAULT_MODEL
         """
         Initialize YOLOv8 detector
         
@@ -29,6 +27,9 @@ class ObjectDetector:
             model_path: Path to YOLOv8 model file
             confidence_threshold: Minimum confidence for detection
         """
+        if model_path is None:
+            model_path = _DEFAULT_MODEL
+        
         self.confidence_threshold = confidence_threshold
         self.model = None
         self.detections = []

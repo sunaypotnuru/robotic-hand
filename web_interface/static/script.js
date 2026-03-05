@@ -43,29 +43,40 @@ let twinEnabled = true;
 document.addEventListener('DOMContentLoaded', () => {
     initSocketIO();
 
-    // Page-specific initializers
+    // The router.js will now call initDashboard(), initSettings(), etc., when pages are shown.
+    // However, if a user directly loads /settings, the router should handle it.
+
+    initSidebar(); // Still run initially to set up styling
+});
+
+// ==================== PAGE INITIALIZERS ====================
+
+window.initDashboard = function() {
     if (document.getElementById('telemetry-chart')) {
         initTelemetryChart();
     }
-
-    if (document.getElementById('video-feed')) {
-        initDashboardControls();
-        initDigitalTwin();
-        initVirtualJoystick();
-    }
-
-    if (document.getElementById('toggle-track')) {
-        initSettingsControls();
-    }
-
-    if (document.getElementById('motor-2')) {
-        initCalibrationControls();
-    }
-
+    initDashboardControls();
+    initDigitalTwin();
+    initVirtualJoystick();
     initVoiceCommands();
     initGamepad();
-    initSidebar();
-});
+};
+
+window.initSettings = function() {
+    initSettingsControls();
+};
+
+window.initDiagnostics = function() {
+    initCalibrationControls();
+};
+
+window.initLogs = async function() {
+    // Basic init if we were to fetch logs via AJAX
+};
+
+window.initProfile = function() {
+    // Static after login, no specific init needed for now
+};
 
 // ==================== SIDEBAR ====================
 function initSidebar() {
@@ -131,8 +142,12 @@ function updateEmergencyUI(active) {
 // ==================== DASHBOARD LOGIC ====================
 
 function initTelemetryChart() {
+    if (telemetryChart) {
+        telemetryChart.destroy(); // Make idempotent
+    }
     const ctx = document.getElementById('telemetry-chart')?.getContext('2d');
     if (!ctx) return;
+    
     telemetryChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -287,11 +302,19 @@ function initDigitalTwin() {
             if (name.includes('Node14')) joints[9] = child;
         });
 
-        // Expose for browser subagent debugging
+        // Expose for browser debugging
         window.lunaArm = armModel;
         window.lunaJoints = joints;
 
         console.log("🤖 LUNA GLB LOADED. Joints detected:", Object.keys(joints));
+        
+        // Validation: Check for missing joints
+        const requiredJoints = [2, 3, 4, 5, 6, 7, 8, 9];
+        const missingJoints = requiredJoints.filter(id => !joints[id]);
+        if (missingJoints.length > 0) {
+            console.warn(`⚠️ Missing joints in model: ${missingJoints.join(', ')}`);
+            console.warn("Digital twin animation may not work correctly for these motors.");
+        }
     }, undefined, (error) => {
         console.error("❌ GLB LOAD FAILED:", error);
     });
@@ -393,8 +416,8 @@ function initSettingsControls() {
 
 function initCalibrationControls() {
     for (let i = 2; i <= 9; i++) {
-        const slider = document.getElementById(`motor-${i}`);
-        const valueEl = document.getElementById(`motor-${i}-value`);
+        const slider = document.getElementById(`motor-${i}-diag`);
+        const valueEl = document.getElementById(`motor-${i}-value-diag`);
         if (slider) {
             slider.addEventListener('input', (e) => {
                 const angle = parseInt(e.target.value);
@@ -407,8 +430,8 @@ function initCalibrationControls() {
 
 function syncUIWithState() {
     for (let i = 2; i <= 9; i++) {
-        const slider = document.getElementById(`motor-${i}`);
-        const valueEl = document.getElementById(`motor-${i}-value`);
+        const slider = document.getElementById(`motor-${i}-diag`);
+        const valueEl = document.getElementById(`motor-${i}-value-diag`);
         if (slider && robotState.motors[i] !== undefined) {
             slider.value = robotState.motors[i];
             if (valueEl) valueEl.textContent = robotState.motors[i];
@@ -461,9 +484,17 @@ function initGamepad() {
 
 function updateGamepadStatus(connected) {
     const statusEl = document.getElementById('gamepad-status');
+    const statusElRight = document.getElementById('gamepad-status-right');
+    const text = connected ? '🎮 GP-LINK ACTIVE' : '🎮 GP-LINK LOST';
+    const color = connected ? '#0aff0a' : '#ff2a2a';
+    
     if (statusEl) {
-        statusEl.textContent = connected ? '🎮 GP-LINK ACTIVE' : '🎮 GP-LINK LOST';
-        statusEl.style.color = connected ? '#0aff0a' : '#ff2a2a';
+        statusEl.textContent = text;
+        statusEl.style.color = color;
+    }
+    if (statusElRight) {
+        statusElRight.textContent = text;
+        statusElRight.style.color = color;
     }
 }
 

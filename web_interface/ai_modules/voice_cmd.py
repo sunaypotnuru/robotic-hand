@@ -259,9 +259,12 @@ class VoiceCommandProcessor:
     def start_listening(self):
         if self.is_listening: return
         
-        # Check if we have the required components
-        if not self.microphone and not self.use_whisper:
-            # Silent fail for now is okay, we handle it in main
+        # Verify we have BOTH whisper model AND microphone, or speech_recognizer
+        if self.use_whisper and (not self.whisper_model or not self.microphone):
+            logger.warning("⚠️ Cannot start listening: Whisper enabled but model/mic unavailable")
+            return
+        if not self.use_whisper and not self.speech_recognizer:
+            logger.warning("⚠️ Cannot start listening: Speech recognizer unavailable")
             return
 
         self.is_listening = True

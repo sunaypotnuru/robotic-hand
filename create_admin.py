@@ -1,6 +1,10 @@
 import os
 from app import app, db, User, SiteContent, TeamMember
 from werkzeug.security import generate_password_hash
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 def bootstrap():
     with app.app_context():
@@ -10,17 +14,25 @@ def bootstrap():
         db.create_all()
         print("✅ Database tables created.")
 
-        # 2. Create Admin User
-        admin_email = "sunaypotnutu@gmail.com"
+        # 2. Create Admin User from environment variables
+        admin_email = os.getenv('ADMIN_EMAIL', 'admin@luna.local')
+        admin_password = os.getenv('ADMIN_PASSWORD')
+        
+        if not admin_password:
+            print("❌ ERROR: ADMIN_PASSWORD not set in .env file")
+            print("   Please create a .env file with ADMIN_PASSWORD=your-secure-password")
+            return
+        
         admin_user = User.query.filter_by(username=admin_email).first()
         if not admin_user:
-            password = "surya1688*"
             new_admin = User(username=admin_email, role='admin')
-            new_admin.set_password(password)
+            new_admin.set_password(admin_password)
             db.session.add(new_admin)
-            print(f"✅ Admin user created: {admin_email} / {password}")
+            print(f"✅ Admin user created: {admin_email}")
+            print(f"   Password: (stored securely from .env)")
         else:
-            print(f"ℹ️ Admin user {admin_email} already exists.")
+            admin_user.set_password(admin_password)
+            print(f"✅ Admin user {admin_email} already exists. Password updated to match .env")
 
         # 3. Populate Initial CMS Content
         initial_content = {

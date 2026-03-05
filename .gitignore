@@ -43,3 +43,18 @@ try_passwords.py
 migrate_users.py
 update_admin_profile.py
 create_operator.py
+
+
+# Environment variables (CRITICAL - DO NOT COMMIT)
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Recordings
+recordings/*.json
