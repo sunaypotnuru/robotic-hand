@@ -8,7 +8,7 @@ import queue
 import logging
 from datetime import datetime
 from functools import wraps
-from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for, flash, send_from_directory
 from flask_socketio import SocketIO, emit
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
@@ -32,11 +32,26 @@ logger = logging.getLogger("LUNA")
 # Add web_interface to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'web_interface'))
 
-from ai_modules.object_detect import ObjectDetector
-from ai_modules.hand_tracking import HandTracker
-from ai_modules.voice_cmd import VoiceCommandProcessor
-from ai_modules.kinematics import SimpleKinematics
-from ai_modules.motion_recorder import MotionRecorder
+from web_interface.ai_modules.object_detect import ObjectDetector
+from web_interface.ai_modules.hand_tracking import HandTracker
+from web_interface.ai_modules.voice_cmd import VoiceCommandProcessor
+from web_interface.ai_modules.kinematics import SimpleKinematics
+from web_interface.ai_modules.motion_recorder import MotionRecorder
+from web_interface.ai_modules.vision_processor import VisionProcessor
+from web_interface.ai_modules.webrtc_signaling import WebRTCSignalingNamespace
+
+try:
+    from web_interface.ai_modules.path_planner import PathPlanner
+except Exception as e:
+    logger.error(f"[IMPORT] Failed to import PathPlanner: {e}")
+    PathPlanner = None
+
+try:
+    from web_interface.ai_modules.macro_executor import MacroExecutor
+except Exception as e:
+    logger.error(f"[IMPORT] Failed to import MacroExecutor: {e}")
+    MacroExecutor = None
+
 from utils.validators import InputValidator
 
 # Initialize Flask App
@@ -62,6 +77,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
+    'connect_args': {'connect_timeout': 5} if 'postgresql' in (db_url or '') else {},
 }
 
 # Upload settings
@@ -138,6 +154,9 @@ class User(UserMixin, db.Model):
     linkedin_url = db.Column(db.String(200))
     github_url = db.Column(db.String(200))
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -155,11 +174,17 @@ class TeamMember(db.Model):
     github_url = db.Column(db.String(200))
     display_order = db.Column(db.Integer, default=0)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 class SiteContent(db.Model):
     __tablename__ = 'site_content'
     id = db.Column(db.Integer, primary_key=True)
     page_section = db.Column(db.String(100), unique=True, nullable=False)
     content_text = db.Column(db.Text, nullable=False)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 class MissionLog(db.Model):
     __tablename__ = 'mission_logs'
@@ -171,46 +196,86 @@ class MissionLog(db.Model):
 
     user = db.relationship('User', backref=db.backref('logs', cascade='all, delete-orphan'))
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+class LoginHistory(db.Model):
+    __tablename__ = 'login_history'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    ip_address = db.Column(db.String(45), nullable=False)
+    user_agent = db.Column(db.String(255), nullable=False)
+    login_time = db.Column(db.DateTime, default=datetime.utcnow)
+    success = db.Column(db.Boolean, default=True)
+    
+    user = db.relationship('User', backref=db.backref('login_history', lazy='dynamic', cascade='all, delete'))
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 # ==================== HELPERS ====================
 
+log_queue = queue.Queue()
+
 def log_mission(command_type: str, details: Dict[str, Any], user_id: Optional[int] = None) -> None:
     """
-    Log robotic actions to the database.
-    
-    Args:
-        command_type: Type of command (motor, batch, system, etc.)
-        details: Dict of command details to store as JSON
-        user_id: Optional explicit user ID. If None, falls back to current
-                 request user, then first admin in DB
+    Log robotic actions to the database using an asynchronous thread-safe batch queue (B5)
     """
-    with app.app_context():
+    resolved_id = user_id
+    if resolved_id is None:
         try:
-            resolved_id = user_id
-            if resolved_id is None:
-                from flask import has_request_context
-                if has_request_context() and current_user.is_authenticated:
-                    resolved_id = current_user.id
-                else:
-                    # Background thread fallback: use first admin
-                    system_user = User.query.filter_by(role='admin').first()
-                    if system_user:
-                        resolved_id = system_user.id
+            from flask import has_request_context
+            if has_request_context() and current_user.is_authenticated:
+                resolved_id = current_user.id
+        except Exception:
+            pass
             
-            if resolved_id:
-                log = MissionLog(
-                    user_id=resolved_id,
-                    command=command_type,
-                    robot_state=details
-                )
-                db.session.add(log)
-                db.session.commit()
-        except Exception as e:
-            logger.error(f"[WARN] Mission log failed: {e}")
-            db.session.rollback()
+    log_queue.put({
+        'user_id': resolved_id,
+        'command': command_type,
+        'robot_state': details,
+        'timestamp': datetime.utcnow()
+    })
+
+def async_batch_logger_thread():
+    """
+    Background worker periodically flushing queued mission logs to the database every 5 seconds (B5)
+    """
+    logger.info("[THREAD] Async batch DB logger thread initialized")
+    while True:
+        time.sleep(5)
+        logs_to_write = []
+        while not log_queue.empty():
+            try:
+                logs_to_write.append(log_queue.get_nowait())
+            except queue.Empty:
+                break
+        
+        if logs_to_write:
+            with app.app_context():
+                try:
+                    system_user = User.query.filter_by(role='admin').first()
+                    system_id = system_user.id if system_user else None
+                    
+                    for log_data in logs_to_write:
+                        uid = log_data['user_id'] or system_id
+                        if uid:
+                            log_entry = MissionLog(
+                                user_id=uid,
+                                command=log_data['command'],
+                                robot_state=log_data['robot_state'],
+                                timestamp=log_data['timestamp']
+                            )
+                            db.session.add(log_entry)
+                    db.session.commit()
+                    logger.debug(f"[DB] Successfully batch-committed {len(logs_to_write)} mission logs.")
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"[ERROR] Asynchronous batch logging failed: {e}")
 
 def admin_required(f):
     @wraps(f)
@@ -249,16 +314,72 @@ robot_state = {
     },
 }
 
-# Serial Communication
+# Serial Communication & Bimanual Arm Support (Resolved Feature 4)
 arduino_serial = None
 serial_thread = None
 serial_lock = threading.Lock()
 serial_queue = queue.Queue()
 
+# Dual-Arm Bimanual Queues and Connection Holders
+arduino_left = None
+arduino_right = None
+left_serial_queue = queue.Queue()
+right_serial_queue = queue.Queue()
+left_serial_lock = threading.Lock()
+right_serial_lock = threading.Lock()
+
+ping_failures = 0
+
+def serial_heartbeat_thread():
+    """
+    Watchdog thread verifying serial connection and executing recovery if 3 consecutive failures occur (B1/A1 Upgrade)
+    """
+    global arduino_serial, ping_failures
+    logger.info("[THREAD] Serial heartbeat watchdog active using PING/PONG protocol")
+    while True:
+        time.sleep(5)
+        if not robot_state['connected']:
+            continue
+        try:
+            with serial_lock:
+                if arduino_serial and arduino_serial.is_open:
+                    # Clear input buffer to ensure fresh response
+                    arduino_serial.reset_input_buffer()
+                    # Write ping command
+                    arduino_serial.write(b"PING\n")
+                    
+                    # Read using non-blocking timeout of 1.0s
+                    arduino_serial.timeout = 1.0
+                    response = arduino_serial.readline().decode('utf-8', errors='ignore').strip()
+                    arduino_serial.timeout = SERIAL_TIMEOUT
+                    
+                    if "PONG" in response or "STATUS" in response or "OK" in response or "SYSTEM" in response:
+                        ping_failures = 0
+                    else:
+                        logger.warning(f"[WATCHDOG] Watchdog received unexpected response or timeout: '{response}'")
+                        ping_failures += 1
+                else:
+                    ping_failures += 1
+            
+            if ping_failures >= 3:
+                logger.warning("⚠️ Serial watchdog detected 3 failed pings. Re-initializing connection...")
+                ping_failures = 0
+                with serial_lock:
+                    if arduino_serial:
+                        try:
+                            arduino_serial.close()
+                        except Exception:
+                            pass
+                    init_serial_connection()
+        except Exception as e:
+            logger.error(f"[WATCHDOG] Watchdog ping exception: {e}")
+            ping_failures += 1
+
 # AI Modules
 object_detector = None
 hand_tracker = None
 voice_processor = None
+vision_processor = VisionProcessor()
 kinematics = SimpleKinematics(link_length=28.0)  # 28cm forearm
 motion_recorder = MotionRecorder()  # Motion recording system
 
@@ -301,92 +422,122 @@ def find_arduino_port():
 
 
 def init_serial_connection():
-    """Initialize serial connection to Arduino"""
-    global arduino_serial, SERIAL_PORT
+    """Initialize serial connections to one or two Arduinos (Bimanual support - COM3, COM4) (Feature 3.4)"""
+    global arduino_serial, arduino_left, arduino_right, SERIAL_PORT
     
-    if SERIAL_PORT is None:
-        SERIAL_PORT = find_arduino_port()
-    
-    if SERIAL_PORT is None:
-        logger.warning("[WARN] No Arduino port detected. Running in simulation mode.")
-        robot_state['connected'] = False
-        return False
-    
+    # Initialize bimanual left arm (COM3)
     try:
-        arduino_serial = serial.Serial(
-            SERIAL_PORT, 
-            BAUD_RATE, 
-            timeout=SERIAL_TIMEOUT,
-            write_timeout=1.0
-        )
-        time.sleep(2)  # Wait for Arduino to initialize
-        robot_state['connected'] = True
-        logger.info(f"[OK] Connected to Arduino on {SERIAL_PORT}")
-        return True
+        arduino_left = serial.Serial('COM3', BAUD_RATE, timeout=SERIAL_TIMEOUT, write_timeout=1.0)
+        time.sleep(1)
+        logger.info("[OK] Connected to Left Arm on COM3")
     except Exception as e:
-        logger.error(f"[ERROR] Serial connection error: {e}")
-        robot_state['connected'] = False
-        return False
+        logger.info("[SIM] Left arm COM3 not connected. Single or simulation mode.")
+        arduino_left = None
 
+    # Initialize bimanual right arm (COM4)
+    try:
+        arduino_right = serial.Serial('COM4', BAUD_RATE, timeout=SERIAL_TIMEOUT, write_timeout=1.0)
+        time.sleep(1)
+        logger.info("[OK] Connected to Right Arm on COM4")
+    except Exception as e:
+        logger.info("[SIM] Right arm COM4 not connected.")
+        arduino_right = None
 
-def send_motor_command(motor_id: int, angle: int, force: bool = False) -> bool:
+    # Standard Fallback single arm setup
+    if arduino_right is None:
+        if SERIAL_PORT is None:
+            SERIAL_PORT = find_arduino_port()
+        
+        if SERIAL_PORT is not None:
+            try:
+                arduino_serial = serial.Serial(
+                    SERIAL_PORT, 
+                    BAUD_RATE, 
+                    timeout=SERIAL_TIMEOUT,
+                    write_timeout=1.0
+                )
+                time.sleep(2)  # Wait for Arduino to initialize
+                arduino_right = arduino_serial
+                robot_state['connected'] = True
+                logger.info(f"[OK] Connected to Standard Arm on {SERIAL_PORT}")
+                return True
+            except Exception as e:
+                logger.error(f"[ERROR] Serial connection error: {e}")
+                robot_state['connected'] = False
+                return False
+        else:
+            logger.warning("[WARN] No Arduino port detected. Running in simulation mode.")
+            robot_state['connected'] = False
+            return False
+    else:
+        arduino_serial = arduino_right
+        robot_state['connected'] = True
+        return True
+def send_motor_command_arm(arm_id: str, motor_id: int, angle: int, force: bool = False) -> bool:
     """
-    Send motor command to Arduino with validation.
-    
-    CRITICAL: Never send commands to ID 0 or 1 (removed shoulder motors).
-    
-    Args:
-        motor_id: Motor ID (2-9 valid range)
-        angle: Target angle in degrees (0-180)
-        force: Override emergency stop if True
-    
-    Returns:
-        True if command sent successfully, False otherwise
+    Send motor command to a specific arm (left or right) (Feature 3.4)
     """
-    # Safety check: Block IDs 0 and 1
+    # Safety checks
     if motor_id in [0, 1]:
-        print(f"[WARN] BLOCKED: Attempted to control removed motor ID {motor_id}")
+        logger.warning(f"[WARN] BLOCKED: Attempted to control removed motor ID {motor_id}")
         return False
-    
-    # Validate motor ID range
     if motor_id < 2 or motor_id > 9:
-        print(f"[WARN] INVALID: Motor ID {motor_id} out of range (2-9)")
+        logger.warning(f"[WARN] INVALID: Motor ID {motor_id} out of range (2-9)")
         return False
-    
-    # Validate angle range
     angle = max(0, min(180, int(angle)))
     
-    # Emergency stop check
     if robot_state['emergency_stop'] and not force:
         logger.warning("[STOP] EMERGENCY STOP ACTIVE - Command blocked")
         return False
-    
-    # Update state
-    robot_state['motors'][motor_id] = angle
-    
-    # Record frame if recording
-    motion_recorder.record_frame(robot_state['motors'])
-    
-    # Add to serial queue
+
     command = f"M:{motor_id}:{angle}\n"
-    serial_queue.put(command)
     
-    # Log the mission
-    log_mission('motor', {'motor_id': motor_id, 'angle': angle, 'timestamp': time.time()})
-    
+    if arm_id.lower() == 'left':
+        if arduino_left:
+            left_serial_queue.put(command)
+            logger.debug(f"[OUT-L] Queued command: {command.strip()}")
+            return True
+        else:
+            # Fallback to simulation
+            logger.debug(f"[SIM-L] Simulated Left: {command.strip()}")
+            return True
+    else:
+        if arduino_right:
+            right_serial_queue.put(command)
+            logger.debug(f"[OUT-R] Queued command: {command.strip()}")
+            return True
+        else:
+            logger.debug(f"[SIM-R] Simulated Right: {command.strip()}")
+            return True
+
+def wait_for_arm(arm_id: str, timeout: float = 2.0) -> bool:
+    """
+    Bimanual sync primitive: Blocks execution until all pending commands in arm_id queue are sent (Feature 3.4)
+    """
+    start_time = time.time()
+    q = left_serial_queue if arm_id.lower() == 'left' else right_serial_queue
+    while not q.empty():
+        if time.time() - start_time > timeout:
+            logger.warning(f"[SYNC] Timeout waiting for arm {arm_id} to complete movements.")
+            return False
+        time.sleep(0.01)
     return True
 
+def send_motor_command(motor_id: int, angle: int, force: bool = False) -> bool:
+    """Send standard motor command to the default right arm"""
+    # Clamp angle first to prevent out-of-bounds state pollution
+    angle = max(0, min(180, int(angle)))
+    # Update default state
+    robot_state['motors'][motor_id] = angle
+    # Record frame if recording
+    motion_recorder.record_frame(robot_state['motors'])
+    # Log direct mission
+    log_mission('motor', {'motor_id': motor_id, 'angle': angle, 'timestamp': time.time()})
+    return send_motor_command_arm('right', motor_id, angle, force)
 
 def send_batch_commands(commands_dict: Dict[int, int]) -> bool:
     """
-    Send multiple motor commands in batch format: B:ID:ANGLE:ID:ANGLE...
-    
-    Args:
-        commands_dict: Dictionary mapping motor IDs to angles
-                      Example: {2: 90, 3: 45, 4: 135}
-    
-    Returns:
-        True if batch sent successfully, False otherwise
+    Send multiple motor commands in batch format to the default right arm
     """
     # Filter out IDs 0 and 1
     valid_commands = {k: v for k, v in commands_dict.items() if k not in [0, 1] and 2 <= k <= 9}
@@ -406,33 +557,63 @@ def send_batch_commands(commands_dict: Dict[int, int]) -> bool:
         batch_parts.append(f"{motor_id}:{angle}")
     
     command = ":".join(batch_parts) + "\n"
-    serial_queue.put(command)
+    
+    if arduino_right:
+        right_serial_queue.put(command)
+    else:
+        serial_queue.put(command)
     
     # Log the mission
     log_mission('batch', {'commands': valid_commands, 'timestamp': time.time()})
-    
     return True
 
-
 def serial_writer_thread():
-    """Background thread to process serial command queue"""
-    logger.info("[THREAD] Serial writer thread started")
-    
+    """Background thread to process legacy/standard serial command queue"""
+    logger.info("[THREAD] Legacy Serial writer thread started")
     while True:
         try:
             command = serial_queue.get(timeout=1.0)
             if arduino_serial and arduino_serial.is_open:
                 with serial_lock:
                     arduino_serial.write(command.encode('utf-8'))
-                logger.debug(f"[OUT] Sent: {command.strip()}")
-            else:
-                logger.debug(f"[SIM] Simulated: {command.strip()}")
+                logger.debug(f"[OUT] Sent standard: {command.strip()}")
             serial_queue.task_done()
         except queue.Empty:
             continue
         except Exception as e:
-            logger.error(f"[ERROR] Serial write error: {e}")
-            time.sleep(0.1)
+            logger.error(f"[ERROR] Standard serial write error: {e}")
+
+def left_serial_writer_thread():
+    """Background thread to process left arm serial queue"""
+    logger.info("[THREAD] Left Arm serial writer started")
+    while True:
+        try:
+            command = left_serial_queue.get(timeout=1.0)
+            if arduino_left and arduino_left.is_open:
+                with left_serial_lock:
+                    arduino_left.write(command.encode('utf-8'))
+                logger.debug(f"[OUT-L] Sent Left: {command.strip()}")
+            left_serial_queue.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.error(f"[ERROR] Left serial write failed: {e}")
+
+def right_serial_writer_thread():
+    """Background thread to process right arm serial queue"""
+    logger.info("[THREAD] Right Arm serial writer started")
+    while True:
+        try:
+            command = right_serial_queue.get(timeout=1.0)
+            if arduino_right and arduino_right.is_open:
+                with right_serial_lock:
+                    arduino_right.write(command.encode('utf-8'))
+                logger.debug(f"[OUT-R] Sent Right: {command.strip()}")
+            right_serial_queue.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            logger.error(f"[ERROR] Right serial write failed: {e}")
 
 
 def emergency_stop() -> None:
@@ -446,6 +627,15 @@ def emergency_stop() -> None:
     Emits 'emergency_stop' event to all connected clients.
     """
     robot_state['emergency_stop'] = True
+    
+    # Flush and empty all pending serial queues to prioritize safety frame (A4 Upgrade)
+    for q in [serial_queue, left_serial_queue, right_serial_queue]:
+        while not q.empty():
+            try:
+                q.get_nowait()
+            except Exception:
+                break
+                
     # Send emergency stop to all motors (set to safe position)
     safe_commands = {
         2: 90,   # Main Pivot: Center
@@ -458,6 +648,8 @@ def emergency_stop() -> None:
         9: 0,
     }
     send_batch_commands(safe_commands)
+    if 'macro_executor' in globals() and macro_executor:
+        macro_executor.cancel_macro()
     socketio.emit('emergency_stop', {'active': True})
     logger.critical("[STOP] EMERGENCY STOP ACTIVATED - All motors to safe position")
 
@@ -512,8 +704,8 @@ def serial_reader_thread():
 
 
 def generate_frames():
-    """Video streaming generator with AI processing"""
-    global camera, object_detector, hand_tracker
+    """Video streaming generator with AI processing (B2 thread safe)"""
+    global camera, vision_processor
     
     if not CV2_AVAILABLE:
         return
@@ -531,32 +723,37 @@ def generate_frames():
                     logger.error(f"[ERROR] Camera error: {e}")
                     return
     
-    # Initialize AI modules if needed
-    if object_detector is None:
-        object_detector = ObjectDetector()
-    if hand_tracker is None:
-        hand_tracker = HandTracker()
+    # Initialize VisionProcessor lazy style
+    if vision_processor and not vision_processor.initialized:
+        vision_processor.initialize()
     
     while True:
+        frame = None
+        # Read the frame inside lock and release immediately (B2)
         with camera_lock:
-            success, frame = camera.read()
-            if not success:
-                break
-            
-            # Process with AI
-            if object_detector:
-                frame = object_detector.process_frame(frame)
-            if hand_tracker:
-                frame = hand_tracker.process_frame(frame)
-            
-            # Encode frame
-            ret, buffer = cv2.imencode('.jpg', frame)
-            if not ret:
-                continue
-            frame_bytes = buffer.tobytes()
-            
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            if camera is not None and camera.isOpened():
+                success, frame = camera.read()
+                if not success:
+                    frame = None
+            else:
+                frame = None
+        
+        if frame is None:
+            time.sleep(0.03)  # Small delay if frame is not ready
+            continue
+        
+        # Process frame sequentially inside unified processor outside lock
+        if vision_processor:
+            frame = vision_processor.process_frame(frame)
+        
+        # Encode frame outside lock
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            continue
+        frame_bytes = buffer.tobytes()
+        
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
 
 # ==================== FLASK ROUTES ====================
@@ -565,40 +762,78 @@ def generate_frames():
 
 @app.route('/api/auth-status', methods=['GET'])
 def auth_status():
-    if current_user.is_authenticated:
-        return jsonify({
-            'authenticated': True,
-            'user': {
-                'username': current_user.username,
-                'role': current_user.role,
-                'full_name': current_user.full_name
-            }
-        })
-    else:
+    try:
+        if current_user.is_authenticated:
+            return jsonify({
+                'authenticated': True,
+                'user': {
+                    'username': current_user.username,
+                    'role': current_user.role,
+                    'full_name': current_user.full_name
+                }
+            })
+        else:
+            return jsonify({'authenticated': False})
+    except Exception as e:
+        logger.warning(f"[AUTH] auth-status DB error (DB may be paused): {e}")
         return jsonify({'authenticated': False})
 
 @app.route('/api/login', methods=['POST'])
 @limiter.limit("5 per minute")  # Prevent brute force attacks
 def api_login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    user = User.query.filter_by(username=username).first()
-    
-    if user and user.check_password(password):
-        login_user(user)
-        logger.info(f"[AUTH] Successful login: {username}")
-        return jsonify({
-            'success': True,
-            'user': {
-                'username': user.username,
-                'role': user.role,
-                'full_name': user.full_name
-            }
-        })
-    else:
-        logger.warning(f"[AUTH] Failed login attempt: {username}")
-        return jsonify({'success': False, 'message': 'Invalid Operator ID or Encryption Key'}), 401
+    try:
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            logger.info(f"[AUTH] Successful login: {username}")
+            
+            # Log Successful Login History
+            try:
+                history = LoginHistory(
+                    user_id=user.id,
+                    ip_address=request.remote_addr or '127.0.0.1',
+                    user_agent=request.headers.get('User-Agent', 'Unknown')[:255],
+                    success=True
+                )
+                db.session.add(history)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"[AUTH] Error logging success history: {e}")
+                
+            return jsonify({
+                'success': True,
+                'user': {
+                    'username': user.username,
+                    'role': user.role,
+                    'full_name': user.full_name
+                }
+            })
+        else:
+            logger.warning(f"[AUTH] Failed login attempt: {username}")
+            
+            # Log Failed Login History
+            try:
+                history = LoginHistory(
+                    user_id=user.id if user else None,
+                    ip_address=request.remote_addr or '127.0.0.1',
+                    user_agent=request.headers.get('User-Agent', 'Unknown')[:255],
+                    success=False
+                )
+                db.session.add(history)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"[AUTH] Error logging failure history: {e}")
+                
+            return jsonify({'success': False, 'message': 'Invalid Operator ID or Encryption Key'}), 401
+    except Exception as e:
+        logger.error(f"[AUTH] Login DB error (DB may be paused): {e}")
+        return jsonify({'success': False, 'message': 'Database unavailable. Please try again later.'}), 503
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
@@ -631,44 +866,54 @@ def index():
 
 @app.route('/about')
 def about():
-    """About page (Dynamic)"""
-    desc = SiteContent.query.filter_by(page_section='about_description').first()
-    return render_template('about.html', 
-                          description=desc.content_text if desc else None)
+    """About page (DB-resilient)"""
+    try:
+        desc = SiteContent.query.filter_by(page_section='about_description').first()
+        description = desc.content_text if desc else None
+    except Exception:
+        description = None
+    return render_template('about.html', description=description)
 
 
 @app.route('/contact')
 def contact():
-    """Contact page (Dynamic)"""
-    email = SiteContent.query.filter_by(page_section='contact_email').first()
-    phone = SiteContent.query.filter_by(page_section='contact_phone').first()
-    address = SiteContent.query.filter_by(page_section='contact_address').first()
-    github = SiteContent.query.filter_by(page_section='contact_github').first()
-    linkedin = SiteContent.query.filter_by(page_section='contact_linkedin').first()
-    university = SiteContent.query.filter_by(page_section='institution_website').first()
+    """Contact page (DB-resilient)"""
+    def safe_get(section):
+        try:
+            item = SiteContent.query.filter_by(page_section=section).first()
+            return item.content_text if item else None
+        except Exception:
+            return None
     return render_template('contact.html',
-                          email=email.content_text if email else None,
-                          phone=phone.content_text if phone else None,
-                          address=address.content_text if address else None,
-                          github=github.content_text if github else None,
-                          linkedin=linkedin.content_text if linkedin else None,
-                          university=university.content_text if university else None)
+                          email=safe_get('contact_email'),
+                          phone=safe_get('contact_phone'),
+                          address=safe_get('contact_address'),
+                          github=safe_get('contact_github'),
+                          linkedin=safe_get('contact_linkedin'),
+                          university=safe_get('institution_website'))
 
 
 @app.route('/features')
 def features():
-    """Features page (Dynamic)"""
-    hardware = SiteContent.query.filter_by(page_section='tech_specs_hardware').first()
-    brain = SiteContent.query.filter_by(page_section='tech_specs_brain').first()
-    return render_template('features.html', 
-                          hardware=hardware.content_text if hardware else None,
-                          brain=brain.content_text if brain else None)
+    """Features page (DB-resilient)"""
+    def safe_get(section):
+        try:
+            item = SiteContent.query.filter_by(page_section=section).first()
+            return item.content_text if item else None
+        except Exception:
+            return None
+    return render_template('features.html',
+                          hardware=safe_get('tech_specs_hardware'),
+                          brain=safe_get('tech_specs_brain'))
 
 
 @app.route('/team')
 def team():
-    """Team page (Dynamic)"""
-    members = TeamMember.query.order_by(TeamMember.display_order).all()
+    """Team page (DB-resilient)"""
+    try:
+        members = TeamMember.query.order_by(TeamMember.display_order).all()
+    except Exception:
+        members = []
     return render_template('team.html', members=members)
 
 @app.route('/settings')
@@ -679,7 +924,24 @@ def settings():
 @app.route('/diagnostics')
 @login_required
 def diagnostics():
-    return render_template('diagnostics.html')
+    """Render the interactive system diagnostics and telemetry dashboard"""
+    report_path = 'luna_diagnostic_report.json'
+    if not os.path.exists(report_path):
+        try:
+            import subprocess
+            subprocess.run(['python', 'diagnose_system.py'], check=True)
+        except Exception as e:
+            logger.error(f"[DIAGNOSTICS] Failed to auto-generate report: {e}")
+    
+    report_data = {}
+    if os.path.exists(report_path):
+        try:
+            with open(report_path, 'r', encoding='utf-8') as f:
+                report_data = json.load(f)
+        except Exception as e:
+            logger.error(f"[DIAGNOSTICS] Error reading report: {e}")
+            
+    return render_template('diagnostics.html', report=report_data)
 
 
 
@@ -696,22 +958,215 @@ def get_state():
     return jsonify(robot_state)
 
 
+@app.route('/api/sensors')
+def get_sensors():
+    """Get current sensor readings"""
+    return jsonify(robot_state['sensors'])
+
+
 @app.route('/api/motors', methods=['POST'])
 def set_motor():
     """Set motor angle via REST API"""
-    from flask import request
     data = request.json
     motor_id = data.get('motor_id')
     angle = data.get('angle')
-    
     if motor_id is None or angle is None:
         return jsonify({'error': 'Missing motor_id or angle'}), 400
-    
     success = send_motor_command(motor_id, angle)
-    return jsonify({'success': success})
+    return jsonify({'success': success, 'motor_id': motor_id, 'angle': robot_state['motors'].get(motor_id)})
+
+
+@app.route('/api/batch', methods=['POST'])
+def api_batch():
+    """Batch motor commands via REST API"""
+    data = request.json
+    commands = data.get('commands', {})
+    if not commands:
+        return jsonify({'error': 'Missing commands dict'}), 400
+    success = send_batch_commands(commands)
+    return jsonify({'success': success, 'motors': robot_state['motors']})
+
+
+@app.route('/api/home', methods=['POST'])
+def api_home():
+    """Move to home position via REST API"""
+    home_position()
+    return jsonify({'success': True, 'message': 'Returning to home position', 'motors': robot_state['motors']})
+
+
+@app.route('/api/emergency_stop', methods=['POST'])
+def api_emergency_stop():
+    """Trigger emergency stop via REST API"""
+    emergency_stop()
+    return jsonify({'success': True, 'message': 'Emergency stop activated', 'emergency_stop': True})
+
+
+@app.route('/api/recordings')
+@login_required
+def api_recordings():
+    """List all saved recordings via REST API"""
+    recordings = motion_recorder.list_recordings()
+    return jsonify({'recordings': recordings, 'count': len(recordings)})
+
+
+@app.route('/api/profile')
+@login_required
+def api_profile():
+    """Get current user profile data for SPA"""
+    try:
+        log_count = MissionLog.query.filter_by(user_id=current_user.id).count()
+    except Exception:
+        log_count = 0
+    return jsonify({
+        'username': current_user.username,
+        'full_name': current_user.full_name,
+        'role': current_user.role,
+        'bio': current_user.bio,
+        'photo_url': current_user.photo_url,
+        'linkedin_url': current_user.linkedin_url,
+        'github_url': current_user.github_url,
+        'created_at': current_user.created_at.isoformat() if current_user.created_at else None,
+        'log_count': log_count
+    })
+
+
+@app.route('/api/logs')
+@login_required
+def api_logs():
+    """Get mission logs for SPA (paginated)"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        if current_user.role == 'admin':
+            pagination = MissionLog.query.order_by(MissionLog.timestamp.desc()).paginate(
+                page=page, per_page=per_page, error_out=False)
+        else:
+            pagination = MissionLog.query.filter_by(user_id=current_user.id).order_by(
+                MissionLog.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        logs = [{
+            'id': log.id,
+            'timestamp': log.timestamp.isoformat(),
+            'command': log.command,
+            'robot_state': log.robot_state
+        } for log in pagination.items]
+        return jsonify({
+            'logs': logs,
+            'page': page,
+            'pages': pagination.pages,
+            'total': pagination.total,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev
+        })
+    except Exception as e:
+        logger.warning(f"[LOGS] DB error fetching logs: {e}")
+        return jsonify({'logs': [], 'page': 1, 'pages': 0, 'total': 0, 'has_next': False, 'has_prev': False})
 
 
 # ==================== SOCKET.IO EVENTS ====================
+
+# Mount the WebRTC signaling namespace for remote controls (Feature 3.5)
+socketio.on_namespace(WebRTCSignalingNamespace('/remote'))
+
+# Global Path Planner Instance
+path_planner = PathPlanner() if PathPlanner else None
+
+def handle_macro_action(action, target, duration=0.0):
+    """Callback to execute macro commands via physical serial outputs (A2 Upgrade)"""
+    if action == "move" and target:
+        if isinstance(target, dict):
+            safe_moves = {int(k): v for k, v in target.items() if int(k) >= 2}
+            send_batch_commands(safe_moves)
+        elif isinstance(target, (list, tuple)) and len(target) == 3:
+            # Convert 3D coordinates (x, y, z) to actual 4-DOF servo angles using kinematics limits (Feature 6.2)
+            x, y, z = target
+            pivot_angle = kinematics.position_to_angle(y)
+            
+            radius = kinematics.link_length
+            pitch = int(max(0, min(180, (z + radius) / (2.0 * radius) * 180.0)))
+            roll = int(max(0, min(180, (x + radius) / (2.0 * radius) * 180.0)))
+            
+            safe_moves = {2: int(pivot_angle), 3: pitch, 4: roll}
+            send_batch_commands(safe_moves)
+            logger.info(f"[MACRO IK] Mapped coordinates {target} -> Joint Angles: {safe_moves}")
+    elif action == "grab":
+        batch = {i: 180 for i in range(5, 10)}
+        send_batch_commands(batch)
+    elif action == "release":
+        batch = {i: 0 for i in range(5, 10)}
+        send_batch_commands(batch)
+    elif action == "wait":
+        time.sleep(max(0.0, float(duration)))
+
+# Global Macro Executor Instance (Feature 3)
+macro_executor = MacroExecutor(socketio=socketio, command_sender=handle_macro_action) if MacroExecutor else None
+
+@socketio.on('plan_path')
+def handle_plan_path(data):
+    """Handle custom 3D occupancy path planning A*/RRT request (Feature 3.1)"""
+    if not path_planner:
+        logger.warning("[PLANNER] Path planner not initialized.")
+        emit('command_error', {'error': 'Path planner is not available.'})
+        return
+    start = data.get('start', (0.0, 0.0, 0.0))
+    target = data.get('target', (10.0, 20.0, 0.0))
+    obstacles = data.get('obstacles', [])
+    
+    # Re-initialize planner workspace and load current obstacles dynamically
+    path_planner.set_workspace()
+    for obs in obstacles:
+        pos = obs.get('pos', (0.0, 0.0, 0.0))
+        size = obs.get('size', (1.0, 1.0, 1.0))
+        path_planner.add_obstacle(pos, size)
+        
+    path_points = path_planner.plan_path(start, target)
+    emit('path_points', {'points': path_points})
+    logger.info(f"[PLANNER] Dispatched {len(path_points)} path waypoints back to frontend.")
+
+@socketio.on('execute_path')
+def handle_execute_path(data):
+    """Execute planned path waypoints as a macro sequence (Feature 1)"""
+    if not path_planner or not macro_executor:
+        logger.warning("[PLANNER] Path planner or Macro executor not initialized.")
+        emit('command_error', {'error': 'Path planner or Macro executor is not available.'})
+        return
+    points = data.get('points', [])
+    if not points:
+        logger.warning("[PLANNER] Cannot execute empty path trajectory.")
+        return
+        
+    logger.info(f"[PLANNER] Converting {len(points)} waypoints to joint trajectory...")
+    trajectory = path_planner.get_joint_trajectory(points)
+    
+    # Map joint commands to macro action steps
+    macro_steps = []
+    for cmd in trajectory:
+        macro_steps.append({
+            "type": "move",
+            "target": cmd,
+            "duration": 0.5
+        })
+        
+    logger.info(f"[PLANNER] Dispatched {len(macro_steps)} macro steps for path trajectory execution.")
+    macro_executor.start_macro(macro_steps)
+
+@socketio.on('run_macro')
+def handle_run_macro(data):
+    """Trigger a custom macro sequence (Feature 3)"""
+    if not macro_executor:
+        logger.warning("[MACRO] Macro executor not initialized.")
+        emit('command_error', {'error': 'Macro executor is not available.'})
+        return
+    actions = data.get('actions', [])
+    if actions:
+        macro_executor.start_macro(actions)
+        logger.info(f"[MACRO] Started custom macro with {len(actions)} steps.")
+
+@socketio.on('cancel_macro')
+def handle_cancel_macro():
+    """Cancel any active running macro"""
+    if macro_executor:
+        macro_executor.cancel_macro()
+        logger.info("[MACRO] Macro execution cancelled by operator command.")
 
 @socketio.on('connect')
 def handle_connect():
@@ -750,6 +1205,41 @@ def handle_motor_command(data):
             log_mission('MOTOR_DIRECT', {'motor_id': motor_id, 'angle': angle})
             
         emit('command_response', {'success': success, 'motor_id': motor_id, 'angle': angle})
+        socketio.emit('state_update', robot_state)
+
+@socketio.on('motor_command_arm')
+@limiter.limit("100 per minute")
+def handle_motor_command_arm(data):
+    """Handle motor command for a specific arm (left/right) from client with validation (Feature 3.4)"""
+    if not current_user.is_authenticated:
+        return
+    
+    # Validate input
+    try:
+        InputValidator.validate_motor_command(data)
+    except Exception as e:
+        emit('command_error', {'error': str(e)})
+        return
+        
+    arm_id = data.get('arm_id', 'right')
+    motor_id = data.get('motor_id')
+    angle = data.get('angle')
+    
+    if motor_id is not None and angle is not None:
+        success = send_motor_command_arm(arm_id, motor_id, angle)
+        if success:
+            log_mission('MOTOR_DIRECT_ARM', {'arm_id': arm_id, 'motor_id': motor_id, 'angle': angle})
+            
+        emit('command_response', {'success': success, 'arm_id': arm_id, 'motor_id': motor_id, 'angle': angle})
+        
+        # Store individual arm states
+        if arm_id.lower() == 'left':
+            if 'left_motors' not in robot_state:
+                robot_state['left_motors'] = {i: 90 for i in range(2, 10)}
+            robot_state['left_motors'][motor_id] = angle
+        else:
+            robot_state['motors'][motor_id] = angle
+            
         socketio.emit('state_update', robot_state)
 
 
@@ -831,6 +1321,7 @@ def handle_object_click(data):
 @socketio.on('gesture_update')
 def handle_gesture_update(data):
     """Handle hand gesture mimicry from MediaPipe"""
+    global teach_mode_enabled
     # Map MediaPipe landmarks to motor angles
     gestures = data.get('gestures', {})
     
@@ -842,8 +1333,29 @@ def handle_gesture_update(data):
             # Convert fold ratio (0-1) to angle (0-180)
             angle = int(fold_ratio * 180)
             send_motor_command(motor_id, angle)
+            
+    # Record Teach Frame if Teach-by-Demonstration is enabled (Feature 6.1 Upgrade)
+    if teach_mode_enabled:
+        try:
+            motion_recorder.record_teach_frame(gestures, robot_state['motors'])
+        except Exception as e:
+            logger.error(f"[TEACH] Frame recording error: {e}")
     
     socketio.emit('state_update', robot_state)
+
+
+@socketio.on('toggle_teach_mode')
+def handle_toggle_teach_mode(data):
+    """Toggle Teach-by-Demonstration sequence recording (Feature 6.1 Upgrade)"""
+    global teach_mode_enabled
+    enable = data.get('enable', False)
+    teach_mode_enabled = enable
+    if enable:
+        motion_recorder.start_recording(teach_mode=True)
+    else:
+        motion_recorder.stop_recording()
+    socketio.emit('teach_mode_status', {'enabled': teach_mode_enabled})
+    logger.info(f"[TEACH] Teach Mode toggled to: {'ON' if teach_mode_enabled else 'OFF'}")
 
 
 @socketio.on('voice_command')
@@ -891,6 +1403,7 @@ def handle_toggle_voice(data):
 # Global control flags for command execution loop
 track_mode_enabled = False
 mimic_mode_enabled = False
+teach_mode_enabled = False
 
 
 @socketio.on('toggle_track_mode')
@@ -1026,6 +1539,76 @@ def handle_delete_recording(data):
     emit('delete_status', {'success': success, 'filename': filename})
 
 
+@socketio.on('toggle_camera')
+def handle_toggle_camera(data):
+    """Toggle camera on/off"""
+    global camera
+    enable = data.get('enable', True)
+    if not CV2_AVAILABLE:
+        emit('camera_status', {'active': False, 'error': 'OpenCV not available'})
+        return
+    try:
+        if enable and camera is None:
+            with camera_lock:
+                camera = cv2.VideoCapture(config.CAMERA_INDEX)
+                if camera.isOpened():
+                    camera.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
+                    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+                    robot_state['camera_active'] = True
+                    emit('camera_status', {'active': True})
+                    logger.info("[CAMERA] Camera started")
+                else:
+                    camera.release()
+                    camera = None
+                    robot_state['camera_active'] = False
+                    emit('camera_status', {'active': False, 'error': 'Camera not found'})
+        elif not enable and camera is not None:
+            with camera_lock:
+                camera.release()
+                camera = None
+                robot_state['camera_active'] = False
+            emit('camera_status', {'active': False})
+            logger.info("[CAMERA] Camera stopped")
+        else:
+            emit('camera_status', {'active': robot_state['camera_active']})
+    except Exception as e:
+        logger.error(f"[CAMERA] Toggle error: {e}")
+        emit('camera_status', {'active': False, 'error': str(e)})
+
+
+@socketio.on('update_ai_personality')
+def handle_update_ai_personality(data):
+    """Update AI voice/personality settings"""
+    if voice_processor:
+        tone = data.get('tone', 'professional')
+        response_length = data.get('response_length', 'brief')
+        # Store as attributes for future use in voice prompts
+        voice_processor.personality_tone = tone
+        voice_processor.response_length = response_length
+        emit('ai_personality_updated', {'success': True, 'tone': tone, 'response_length': response_length})
+        logger.info(f"[AI] Personality updated: tone={tone}, length={response_length}")
+    else:
+        emit('ai_personality_updated', {'success': False, 'error': 'Voice processor not available'})
+
+
+@socketio.on('reset_emergency_stop')
+def handle_reset_estop():
+    """Reset emergency stop flag to resume operations"""
+    robot_state['emergency_stop'] = False
+    socketio.emit('emergency_stop_reset', {'emergency_stop': False})
+    socketio.emit('state_update', robot_state)
+    logger.info("[SAFETY] Emergency stop reset by user")
+
+
+@socketio.on('get_recordings')
+def handle_get_recordings():
+    """Alias for list_recordings (frontend compatibility)"""
+    if not current_user.is_authenticated:
+        return
+    recordings = motion_recorder.list_recordings()
+    emit('recordings_list', {'recordings': recordings})
+
+
 def playback_sequence_thread(sequence: List[Dict]):
     """
     Play back a recorded sequence in a background thread.
@@ -1135,34 +1718,42 @@ def handle_gamepad_data(data):
 
 def command_execution_loop():
     """
-    Main command execution loop - processes AI-generated commands (Gemini + others)
+    Main command execution loop - processes AI-generated commands (Ollama/Gemini + others)
     """
-    
+    last_time = time.perf_counter()
     
     while True:
         try:
-            # 1. Smoothly follow target_motors -- batch all changes per iteration
+            # 1. Smoothly follow target_motors using Delta-Time Interpolation (B3)
+            current_time = time.perf_counter()
+            dt = current_time - last_time
+            last_time = current_time
+            dt = min(0.1, dt)  # Clamp dt to prevent jumps
+            
             batch_moves = {}
+            speed = 45.0  # Degrees per second
             for motor_id, target in robot_state['target_motors'].items():
                 current = robot_state['motors'][motor_id]
-                if abs(current - target) > 0.5:
-                    step = 2.0  # Max degrees per loop
-                    new_pos = min(target, current + step) if target > current else max(target, current - step)
-                    batch_moves[motor_id] = new_pos
+                diff = target - current
+                if abs(diff) > 0.1:
+                    step = speed * dt
+                    if abs(diff) <= step:
+                        new_pos = target
+                    else:
+                        new_pos = current + (step if diff > 0 else -step)
+                    batch_moves[motor_id] = int(new_pos)
             if batch_moves:
                 send_batch_commands(batch_moves)
             
             # ========== VOICE/AI COMMAND HANDLING ==========
-            # Use get() with a short timeout directly -- avoids TOCTOU race
-            # on command_queue.empty() check.
             if voice_processor:
                 command = voice_processor.get_command(timeout=0.05)
                 if command:
                     cmd_type = command.get('type')
                     print(f"[BRAIN] Processing Command: {cmd_type}")
 
-                    # --- GEMINI INTELLIGENT COMMANDS ---
-                    if cmd_type == 'gemini_command':
+                    # --- OLLAMA & GEMINI INTELLIGENT COMMANDS ---
+                    if cmd_type in ['gemini_command', 'ollama_command']:
                         # 1. Speak the AI response first
                         response_text = command.get('response_text')
                         if response_text and voice_processor:
@@ -1172,10 +1763,21 @@ def command_execution_loop():
                         # 2. Execute Motor Movements
                         motor_values = command.get('motor_values', {})
                         if motor_values:
-                            # Filter safe IDs
                             safe_moves = {int(k): v for k, v in motor_values.items() if int(k) >= 2}
                             if safe_moves:
                                 send_batch_commands(safe_moves)
+                    
+                    elif cmd_type == 'macro_sequence':
+                        # 1. Speak the action notification
+                        response_text = command.get('response_text', "Initializing multi-step macro sequence.")
+                        if response_text and voice_processor:
+                             voice_processor.speak(response_text, 
+                                                 lambda text: socketio.emit('robot_speech', {'text': text}))
+                        
+                        # 2. Start macro sequence in the background macro executor thread
+                        actions = command.get('actions', [])
+                        if actions and macro_executor:
+                            macro_executor.start_macro(actions)
                     
                     # --- LEGACY/FALLBACK COMMANDS ---
                     elif cmd_type == 'motor':
@@ -1214,10 +1816,13 @@ def command_execution_loop():
                         break
                 
                 if target_detection:
-                    # Get normalized Y position (0-1)
-                    # Assuming frame is 640x480
+                    # Reset lost frame counter
+                    command_execution_loop.lost_frames = 0
+                    
+                    # Get normalized Y position (0-1) (A3 Upgrade)
+                    center_x = target_detection['center'][0]
                     center_y = target_detection['center'][1]
-                    y_normalized = center_y / 480.0  # Normalize to 0-1
+                    y_normalized = center_y / float(config.CAMERA_HEIGHT)  # Normalize to 0-1
                     
                     # Calculate angle using kinematics
                     target_angle = kinematics.image_y_to_angle(y_normalized)
@@ -1230,11 +1835,68 @@ def command_execution_loop():
                         
                         # TTS feedback (throttled to avoid spam)
                         if not hasattr(command_execution_loop, 'last_track_speech') or \
-                           time.time() - command_execution_loop.last_track_speech > 3:
+                           time.time() - command_execution_loop.last_track_speech > 6:
                             if voice_processor:
-                                voice_processor.speak("Target acquired", 
+                                voice_processor.speak("Target acquired, locking position.", 
                                                     lambda text: socketio.emit('robot_speech', {'text': text}))
                             command_execution_loop.last_track_speech = time.time()
+                    
+                    # --- AUTONOMOUS GRAB PROTOCOL ---
+                    if not hasattr(command_execution_loop, 'stable_frames'):
+                        command_execution_loop.stable_frames = 0
+                    if not hasattr(command_execution_loop, 'is_grabbed'):
+                        command_execution_loop.is_grabbed = False
+                        
+                    # Center limits: 240 <= center_x <= 400 (centered horizontally)
+                    if 240 <= center_x <= 400 and not command_execution_loop.is_grabbed:
+                        command_execution_loop.stable_frames += 1
+                        print(f"[AUTONOMOUS GRAB] stable frames: {command_execution_loop.stable_frames}/12")
+                    else:
+                        command_execution_loop.stable_frames = max(0, command_execution_loop.stable_frames - 1)
+                        
+                    # Trigger autonomous grab sequence when target is stable
+                    if command_execution_loop.stable_frames >= 12 and not command_execution_loop.is_grabbed:
+                        command_execution_loop.is_grabbed = True
+                        command_execution_loop.stable_frames = 0
+                        
+                        print("[AUTONOMOUS GRAB] >>> STARTING PICK-AND-LIFT SEQUENCE <<<")
+                        if voice_processor:
+                            voice_processor.speak("Target locked. Initiating autonomous grab sequence.", 
+                                                lambda text: socketio.emit('robot_speech', {'text': text}))
+                            
+                        # Step 1: Open fingers fully to prepare grab (Servos 5-9 to 0 degrees)
+                        send_batch_commands({5: 0, 6: 0, 7: 0, 8: 0, 9: 0})
+                        time.sleep(0.8)
+                        
+                        # Step 2: Pitch wrist forward towards target (Servo 3 to 120 degrees)
+                        send_motor_command(3, 120)
+                        time.sleep(1.0)
+                        
+                        # Step 3: Securely clench all fingers (Servos 5-9 to 180 degrees)
+                        send_batch_commands({5: 180, 6: 180, 7: 180, 8: 180, 9: 180})
+                        time.sleep(1.2)
+                        
+                        # Step 4: Lift the arm with secured target (Servo 3 to 50 degrees)
+                        send_motor_command(3, 50)
+                        time.sleep(0.8)
+                        
+                        if voice_processor:
+                            voice_processor.speak("Target secured. Secure lift protocol complete.", 
+                                                lambda text: socketio.emit('robot_speech', {'text': text}))
+                else:
+                    # Target lost counter
+                    if not hasattr(command_execution_loop, 'lost_frames'):
+                        command_execution_loop.lost_frames = 0
+                    command_execution_loop.lost_frames += 1
+                    
+                    if command_execution_loop.lost_frames >= 40:
+                        # Reset grab status if target has been missing for ~2 seconds
+                        if hasattr(command_execution_loop, 'is_grabbed') and command_execution_loop.is_grabbed:
+                            command_execution_loop.is_grabbed = False
+                            print("[AUTONOMOUS GRAB] Target lost. Resetting grab protocol.")
+                            if voice_processor:
+                                voice_processor.speak("Target lost. Resetting grab protocol.", 
+                                                    lambda text: socketio.emit('robot_speech', {'text': text}))
             
             # ========== VISION HANDLING - MIMIC MODE ==========
             if mimic_mode_enabled and hand_tracker:
@@ -1293,13 +1955,104 @@ def home_position() -> None:
 @login_required
 @admin_required
 def admin_dashboard():
-    user_count = User.query.count()
-    team_count = TeamMember.query.count()
-    log_count = MissionLog.query.count()
+    try:
+        user_count = User.query.count()
+        team_count = TeamMember.query.count()
+        log_count = MissionLog.query.count()
+        history_count = LoginHistory.query.count()
+    except Exception:
+        user_count = team_count = log_count = history_count = 0
     return render_template('admin/dashboard.html',
                            user_count=user_count,
                            team_count=team_count,
-                           log_count=log_count)
+                           log_count=log_count,
+                           history_count=history_count)
+
+@app.route('/admin/call-graph')
+@login_required
+@admin_required
+def admin_call_graph():
+    """Serve the interactive Graphify system call graph"""
+    try:
+        # Check if the graph HTML exists, if not generate it on the fly!
+        if not os.path.exists('LUNA_Call_Graph.html'):
+            try:
+                # Run the graph generator script
+                import subprocess
+                subprocess.run(['python', 'luna_make_graph.py'], check=True)
+            except Exception as e:
+                logger.error(f"[GRAPHIFY] Failed to auto-generate graph: {e}")
+        
+        return send_from_directory('.', 'LUNA_Call_Graph.html')
+    except Exception as e:
+        logger.error(f"[GRAPHIFY] Error serving call graph: {e}")
+        return "System Call Graph is temporarily unavailable.", 500
+
+@app.route('/admin/login-history')
+@login_required
+@admin_required
+def admin_login_history():
+    """Admin view of all login attempts"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 30
+        pagination = LoginHistory.query.order_by(LoginHistory.login_time.desc()).paginate(
+            page=page, per_page=per_page, error_out=False)
+        history_items = pagination.items
+    except Exception as e:
+        logger.error(f"[HISTORY] DB error fetching login history: {e}")
+        history_items = []
+        pagination = None
+        
+    return render_template('admin/login_history.html', history=history_items, pagination=pagination)
+
+@app.route('/api/login-history')
+@login_required
+def api_login_history():
+    """Get current user's login history (SPA API)"""
+    try:
+        history = LoginHistory.query.filter_by(user_id=current_user.id).order_by(
+            LoginHistory.login_time.desc()).limit(10).all()
+        data = [{
+            'id': h.id,
+            'ip_address': h.ip_address,
+            'user_agent': h.user_agent,
+            'login_time': h.login_time.isoformat(),
+            'success': h.success
+        } for h in history]
+        return jsonify({'success': True, 'history': data})
+    except Exception as e:
+        logger.error(f"[HISTORY] API error fetching user history: {e}")
+        return jsonify({'success': False, 'history': []}), 500
+
+@app.route('/login-history')
+@login_required
+def login_history():
+    """User audit logs page showing individual session histories (Resolved login history page)"""
+    try:
+        history = LoginHistory.query.filter_by(user_id=current_user.id).order_by(LoginHistory.login_time.desc()).limit(50).all()
+    except Exception as e:
+        logger.error(f"[HISTORY] User view DB error: {e}")
+        history = []
+    return render_template('login_history_user.html', history=history)
+
+
+
+@app.route('/api/diagnostics/run')
+@login_required
+def api_run_diagnostics():
+    """API endpoint to run a fresh diagnostic profile and return results"""
+    try:
+        import subprocess
+        subprocess.run(['python', 'diagnose_system.py'], check=True)
+        report_path = 'luna_diagnostic_report.json'
+        if os.path.exists(report_path):
+            with open(report_path, 'r', encoding='utf-8') as f:
+                report_data = json.load(f)
+            return jsonify({'success': True, 'report': report_data})
+    except Exception as e:
+        logger.error(f"[DIAGNOSTICS] API run failed: {e}")
+    return jsonify({'success': False, 'message': 'Failed to execute diagnostic profiler.'})
 
 @app.route('/admin/users')
 @login_required
@@ -1487,11 +2240,16 @@ def admin_logs():
 @app.route('/logs')
 @login_required
 def mission_logs():
-    page = request.args.get('page', 1, type=int)
-    if current_user.role == 'admin':
-        logs = MissionLog.query.order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
-    else:
-        logs = MissionLog.query.filter_by(user_id=current_user.id).order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+    """User mission logs (DB-resilient)"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        if current_user.role == 'admin':
+            logs = MissionLog.query.order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+        else:
+            logs = MissionLog.query.filter_by(user_id=current_user.id).order_by(MissionLog.timestamp.desc()).paginate(page=page, per_page=50, error_out=False)
+    except Exception as e:
+        logger.warning(f"[LOGS] DB unavailable: {e}")
+        logs = None
     return render_template('logs.html', logs=logs)
 
 @app.route('/profile')
@@ -1499,6 +2257,8 @@ def mission_logs():
 def profile():
     return render_template('profile.html')
 
+# Support both /change-password and /profile/change-password
+@app.route('/change-password', methods=['GET', 'POST'])
 @app.route('/profile/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
@@ -1511,30 +2271,31 @@ def change_password():
             flash('Current encryption key is incorrect.', 'danger')
         elif new_password != confirm:
             flash('New encryption keys do not match.', 'danger')
+        elif len(new_password) < 6:
+            flash('New encryption key must be at least 6 characters.', 'danger')
         else:
-            current_user.set_password(new_password)
-            db.session.commit()
-            flash('Encryption key updated successfully.', 'success')
-            return redirect(url_for('profile'))
+            try:
+                current_user.set_password(new_password)
+                db.session.commit()
+                flash('Encryption key updated successfully.', 'success')
+                return redirect(url_for('profile'))
+            except Exception as e:
+                db.session.rollback()
+                flash('Database error. Please try again.', 'danger')
     return render_template('change_password.html')
 
 def init_ai_modules():
     """Initialize AI modules in background"""
-    global object_detector, hand_tracker, voice_processor
+    global object_detector, hand_tracker, voice_processor, vision_processor
     
     logger.info("[AI] Initializing AI modules...")
     
     try:
-        object_detector = ObjectDetector()
-        logger.info("[OK] Object Detector ready")
+        if vision_processor:
+            vision_processor.initialize()
+            logger.info("[OK] Unified Vision Processor ready")
     except Exception as e:
-        logger.error(f"[WARN] Object Detector error: {e}")
-    
-    try:
-        hand_tracker = HandTracker()
-        logger.info("[OK] Hand Tracker ready")
-    except Exception as e:
-        logger.error(f"[WARN] Hand Tracker error: {e}")
+        logger.error(f"[WARN] Vision Processor error: {e}")
     
     try:
         voice_processor = VoiceCommandProcessor()
@@ -1552,15 +2313,32 @@ if __name__ == '__main__':
             db.create_all()
             logger.info("[DB] Database tables verified/created")
         except Exception as e:
-            logger.error(f"[ERROR] Database initialization failed: {e}")
+            logger.error(f"[WARN] Database initialization failed (DB may be paused/offline): {e}")
+            logger.warning("[WARN] System will run in OFFLINE mode — authentication disabled, robot control still works")
 
     # Initialize serial connection
     init_serial_connection()
     
-    # Start serial writer thread
+    # Start serial writer threads
     writer_thread = threading.Thread(target=serial_writer_thread, daemon=True)
     writer_thread.start()
-    logger.info("[OK] Serial writer thread started")
+    
+    left_writer_thread = threading.Thread(target=left_serial_writer_thread, daemon=True)
+    left_writer_thread.start()
+    
+    right_writer_thread = threading.Thread(target=right_serial_writer_thread, daemon=True)
+    right_writer_thread.start()
+    logger.info("[OK] Bimanual Serial writer threads started")
+    
+    # Start serial heartbeat watchdog thread (B1)
+    heartbeat_thread = threading.Thread(target=serial_heartbeat_thread, daemon=True)
+    heartbeat_thread.start()
+    logger.info("[OK] Serial heartbeat watchdog thread started")
+    
+    # Start asynchronous database logging worker (B5)
+    db_logger_thread = threading.Thread(target=async_batch_logger_thread, daemon=True)
+    db_logger_thread.start()
+    logger.info("[OK] Async batch logger thread started")
     
     # Start serial reader thread
     if robot_state['connected']:

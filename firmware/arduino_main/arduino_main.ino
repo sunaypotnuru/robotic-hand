@@ -8,6 +8,9 @@ Adafruit_PWMServoDriver pcaHand = Adafruit_PWMServoDriver(0x41); // Hand motors
 // Safety Vars
 int distance = 9999;
 bool emergencyStop = false;
+unsigned long lastSensorPacketTime = 0;
+bool sensorHubOnline = false;
+bool debugMode = false;
 
 // Motor state tracking
 int motorAngles[10] = {0}; // IDs 0-9 (0-1 unused, but array for indexing)
@@ -32,6 +35,7 @@ void setup() {
     moveServo(i, motorAngles[i]);
   }
 
+  lastSensorPacketTime = millis();
   Serial.println("SYSTEM: LUNA Robot Initialized");
   Serial.println("MOTOR MAP: ID 2=Pivot, 3=WristPitch, 4=WristRoll, 5-9=Fingers");
 }
@@ -40,6 +44,8 @@ void loop() {
   // 1. Listen to ESP32 (Safety Layer)
   if (Serial1.available()) {
     String packet = Serial1.readStringUntil('>');
+    lastSensorPacketTime = millis();
+    sensorHubOnline = true;
     
     // Parse sensor data: "<D:150,AX:0.5>"
     if (packet.indexOf("D:") >= 0) {
@@ -51,9 +57,11 @@ void loop() {
       distance = packet.substring(dStart, dEnd).toInt();
       
       // Forward to Laptop for processing
-      Serial.println("SENSOR DATA: <" + packet + ">");
+      if (debugMode) {
+        Serial.println("SENSOR DATA: <" + packet + ">");
+      }
       
-      // Safety check: Emergency stop if too close
+      // Safety check: Emergency stop if too close (NO automatic clear - cleared ONLY on RESET command)
       if (distance < 10 && !emergencyStop) {
         emergencyStop = true;
         Serial.println("EMERGENCY: Distance < 10cm - STOPPING");
@@ -61,11 +69,15 @@ void loop() {
         moveServo(2, 90);
         moveServo(3, 90);
         moveServo(4, 90);
-      } else if (distance >= 10 && emergencyStop) {
-        emergencyStop = false;
-        Serial.println("EMERGENCY CLEARED: Distance safe");
       }
     }
+  }
+
+  // Watchdog: If ESP32 is offline for >2s, warn laptop
+  if (sensorHubOnline && (millis() - lastSensorPacketTime > 2000)) {
+    sensorHubOnline = false;
+    distance = 9999;
+    Serial.println("WARNING: ESP32 Sensor Hub offline!");
   }
 
   // 2. Listen to Laptop (Command Layer)
@@ -114,42 +126,62 @@ void parseCommand(String cmd) {
     emergencyStop = false;
     Serial.println("EMERGENCY RESET");
   }
+  // Debug mode toggle
+  else if (cmd.startsWith("DEBUG:ON")) {
+    debugMode = true;
+    Serial.println("DEBUG: MODE ENABLED");
+  }
+  else if (cmd.startsWith("DEBUG:OFF")) {
+    debugMode = false;
+    Serial.println("DEBUG: MODE DISABLED");
+  }
+  // Status check
+  else if (cmd.startsWith("STATUS")) {
+    String statusStr = "STATUS";
+    for (int i = 2; i <= 9; i++) {
+      statusStr += ":" + String(i) + ":" + String(motorAngles[i]);
+    }
+    Serial.println(statusStr);
+  }
+  // Ping-Pong watchdog protocol (B1 Upgrade)
+  else if (cmd.startsWith("PING")) {
+    Serial.println("PONG");
+  }
   else {
     Serial.println("ERROR: Unknown command format");
   }
 }
 
 void parseBatchCommand(String cmd) {
-  // Format: "B:2:90:3:45:4:90"
-  int startIdx = 2; // Skip "B:"
+  // Format: "B:2:90:3:180:4:90"
+  int idx = 2; // Skip "B:"
+  int len = cmd.length();
   
-  while (startIdx < cmd.length()) {
-    int colon1 = cmd.indexOf(':', startIdx);
-    int colon2 = cmd.indexOf(':', colon1 + 1);
+  while (idx < len) {
+    int col1 = cmd.indexOf(':', idx);
+    if (col1 < 0) break;
     
-    if (colon1 < 0 || colon2 < 0) break;
+    int motorID = cmd.substring(idx, col1).toInt();
     
-    int motorID = cmd.substring(colon1 + 1, colon2).toInt();
-    
-    // Find next colon or end of string
-    int nextStart = cmd.indexOf(':', colon2 + 1);
+    int col2 = cmd.indexOf(':', col1 + 1);
     int angle;
-    if (nextStart < 0) {
-      angle = cmd.substring(colon2 + 1).toInt();
+    if (col2 < 0) {
+      angle = cmd.substring(col1 + 1).toInt();
+      idx = len;
     } else {
-      angle = cmd.substring(colon2 + 1, nextStart).toInt();
+      angle = cmd.substring(col1 + 1, col2).toInt();
+      idx = col2 + 1;
     }
     
-    // Safety: Block IDs 0 and 1
+    // Safety limits
     if (motorID != 0 && motorID != 1 && motorID >= 2 && motorID <= 9 && angle >= 0 && angle <= 180) {
       moveServo(motorID, angle);
     }
-    
-    if (nextStart < 0) break;
-    startIdx = nextStart;
   }
   
-  Serial.println("BATCH: Commands executed");
+  if (debugMode) {
+    Serial.println("BATCH: Commands executed");
+  }
 }
 
 void moveServo(int id, int angle) {
@@ -178,17 +210,17 @@ void moveServo(int id, int angle) {
   // Route to appropriate PCA board
   if (id >= 2 && id <= 4) {
     // Arm motors (PCA Board #1)
-    // ID 2 = Main Pivot (Channel 2) - DS51150
-    // ID 3 = Wrist Pitch (Channel 3) - DS5180
-    // ID 4 = Wrist Roll (Channel 4) - DS5180
     pcaArm.setPWM(id, 0, pulse);
-    Serial.println("ARM: Motor " + String(id) + " -> " + String(angle) + "° (PWM: " + String(pulse) + ")");
+    if (debugMode) {
+      Serial.println("ARM: Motor " + String(id) + " -> " + String(angle) + "° (PWM: " + String(pulse) + ")");
+    }
   } 
   else if (id >= 5 && id <= 9) {
     // Hand motors (PCA Board #2)
-    // IDs 5-9 map to channels 0-4
     int channel = id - 5;
     pcaHand.setPWM(channel, 0, pulse);
-    Serial.println("HAND: Motor " + String(id) + " (Ch" + String(channel) + ") -> " + String(angle) + "° (PWM: " + String(pulse) + ")");
+    if (debugMode) {
+      Serial.println("HAND: Motor " + String(id) + " (Ch" + String(channel) + ") -> " + String(angle) + "° (PWM: " + String(pulse) + ")");
+    }
   }
 }

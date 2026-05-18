@@ -62,7 +62,7 @@ Then open **http://localhost:5000** in your browser.
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   Web Browser   │────▶│   Flask Server  │────▶│  Arduino Mega   │
-│  (SPA + Three.js│     │   (Socket.IO)   │     │  (Motor Control)│
+│ (SPA + Three.js)│     │   (Socket.IO)   │     │  (Motor Control)│
 └─────────────────┘     └─────────────────┘     └─────────────────┘
          │                       │                        │
          │                       │                        │
@@ -113,6 +113,7 @@ LUNA_ROBOTIC_ARM/
 ## 🎯 Hardware Configuration
 
 ### Motor Mapping
+
 - **ID 2:** Main Pivot (Elbow) - DS51150, 7.4V
 - **ID 3:** Wrist Pitch - DS5180, 7.4V
 - **ID 4:** Wrist Roll - DS5180, 7.4V
@@ -121,6 +122,7 @@ LUNA_ROBOTIC_ARM/
 **⚠️ IMPORTANT:** Motor IDs 0 and 1 are **REMOVED** (shoulder assembly). The system blocks commands to these IDs.
 
 ### Power Zones
+
 - **Zone B (7.4V):** PCA9685 Board #1 (Arm motors)
 - **Zone C (6V):** PCA9685 Board #2 (Hand motors)
 - **Zone D (5V):** Arduino, sensors, logic
@@ -211,4 +213,3 @@ This project is for educational and research purposes. See [LICENSE](LICENSE) fo
 ---
 
 **Built with ❤️ for robotics education and research**
-

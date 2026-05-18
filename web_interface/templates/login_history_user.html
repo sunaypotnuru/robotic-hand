@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}My Security Audit Trail{% endblock %}
+
+{% block header_title %}SECURITY AUDIT LOGS{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <h2 style="color: #00f3ff; letter-spacing: 2px;">📋 MY RECENT LOGIN SESSIONS</h2>
+    <p class="hint" style="margin-bottom: 20px;">Operator session logs tracked locally for safety verification.</p>
+    
+    <table class="hud-table" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 80px;">ID</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 150px;">IP Address</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">User Agent</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 180px;">Timestamp</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 120px;">Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in history %}
+            <tr class="{% if loop.index0 % 2 == 0 %}row-even{% else %}row-odd{% endif %}">
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15);">{{ entry.id }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15); color: #00f3ff;">{{ entry.ip_address }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15); color: #ccc; font-size: 0.9em; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ entry.user_agent }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15); color: #888;">{{ entry.login_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15);">
+                    {% if entry.success %}
+                        <span class="badge badge-success" style="background: rgba(0, 255, 100, 0.1); color: #00ff66; padding: 4px 8px; border-radius: 3px; border: 1px solid rgba(0, 255, 100, 0.3);">SUCCESS</span>
+                    {% else %}
+                        <span class="badge badge-danger" style="background: rgba(255, 50, 50, 0.1); color: #ff3e3e; padding: 4px 8px; border-radius: 3px; border: 1px solid rgba(255, 50, 50, 0.3);">FAILED</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="padding: 30px; text-align: center; color: #888;">No session records found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .hud-table th, .hud-table td {
+        border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+    }
+    .row-even {
+        background: rgba(0, 243, 255, 0.02) !important;
+    }
+    .row-odd {
+        background: transparent !important;
+    }
+</style>
+{% endblock %}

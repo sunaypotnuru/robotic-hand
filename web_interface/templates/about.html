@@ -2,15 +2,75 @@
 
 {% block title %}About{% endblock %}
 
-{% block header_title %}MISSION OVERVIEW{% endblock %}
+{% block header_title %}MISSION OVERVIEW & ROBOTIC ANALYSIS{% endblock %}
 
 {% block content %}
-<div class="panel">
-    <div class="about-content" style="line-height: 1.6; font-size: 1.1rem; color: #ddd;">
-        <h2 style="color: #00f3ff; margin-bottom: 20px;">PROJECT LUNA</h2>
-        {{ description|safe if description else '<p>Project LUNA is a 4-DOF robotic arm powered by Gemini AI, designed
-            for research and education in robotics.</p>
-        <p>Developed by Team Invicta at Universal AI University, Karjat.</p>'|safe }}
+<div class="panel" style="margin-bottom: 30px;">
+    <h2 style="color: #00f3ff; margin-bottom: 20px; letter-spacing: 2px;">PROJECT LUNA: CYBERNETIC COGNITION</h2>
+    <div class="about-intro" style="line-height: 1.8; font-size: 1.1rem; color: #ddd; margin-bottom: 30px;">
+        <p>
+            <strong>Project LUNA</strong> (Logical Utility & Neural Arm) represents a revolutionary advancement in 
+            human-robot interfaces, designed as a highly integrated cybernetic arm and hand system. It synthesizes 
+            the computational efficiency of locally-hosted vision pipelines with the massive cognitive flexibility 
+            of advanced large language models. Operating on a robust dual-serial hardware backplane, LUNA bridges 
+            the physical gap between digital twins and actual robotic manipulators.
+        </p>
+        <p style="margin-top: 15px;">
+            Developed by <strong>Team Invicta</strong> at <strong>Universal AI University, Karjat</strong>, LUNA serves 
+            as an industrial-grade research platform exploring bimanual coordination, safety perimeters, autonomous 
+            spline-based path planning, and voice-command reasoning models.
+        </p>
+    </div>
+
+    <div class="about-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; margin-top: 30px;">
+        <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.3);">
+            <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.2); padding-bottom: 10px; margin-bottom: 15px;">🎯 SYSTEM MISSION OBJECTIVES</h3>
+            <ul style="color: #bbb; padding-left: 20px; line-height: 1.7;">
+                <li style="margin-bottom: 10px;"><strong>Bimanual Control:</strong> Dynamic, low-latency target synchronization across separate left and right arm pipelines.</li>
+                <li style="margin-bottom: 10px;"><strong>Cognitive Reasoning:</strong> Continuous semantic analysis of complex operator natural language requests via Gemini 1.5 Pro.</li>
+                <li style="margin-bottom: 10px;"><strong>Anti-Gravity Safety:</strong> Zero-tolerance hardware perimeter watchdog enforcing microsecond halt triggers upon intruder proximity detection.</li>
+            </ul>
+        </div>
+
+        <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.3);">
+            <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.2); padding-bottom: 10px; margin-bottom: 15px;">🎛️ DISTRIBUTED COMPUTE INFRASTRUCTURE</h3>
+            <ul style="color: #bbb; padding-left: 20px; line-height: 1.7;">
+                <li style="margin-bottom: 10px;"><strong>RTX 4060 GPU Orchestrator:</strong> Driving 100+ FPS vision processing running YOLOv8 object recognition and MediaPipe hand skeleton tracking.</li>
+                <li style="margin-bottom: 10px;"><strong>Dual-PCA9685 Co-Processors:</strong> High-precision 16-channel hardware PWM generation operating over distinct I2C nodes (0x40 and 0x41).</li>
+                <li style="margin-bottom: 10px;"><strong>Arduino & ESP32 Hubs:</strong> Real-time hardware telemetry aggregation and laser Time-of-Flight sensor read-outs.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom: 30px;">
+    <h2 style="color: #00f3ff; margin-bottom: 20px; letter-spacing: 2px;">🔬 ADVANCED ROBOTIC ENGINE DESIGN</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; color: #ddd; line-height: 1.7;">
+        <div style="background: rgba(0, 243, 255, 0.03); padding: 20px; border-radius: 5px; border-left: 4px solid #00f3ff;">
+            <h3 style="color: #00f3ff; margin-bottom: 10px;">📐 Kinematic Splines</h3>
+            <p style="font-size: 0.95rem;">
+                LUNA utilizes custom analytical Inverse Kinematics equations mapped to three-dimensional vector targets. 
+                Instead of disjoint angular jumps, target coordinates are computed as smooth cubic Hermite splines. 
+                This ensures optimal energy distribution across MG996R high-torque actuators, yielding fluid organic movement.
+            </p>
+        </div>
+        <div style="background: rgba(0, 243, 255, 0.03); padding: 20px; border-radius: 5px; border-left: 4px solid #00f3ff;">
+            <h3 style="color: #00f3ff; margin-bottom: 10px;">🛰️ Autonomous A* / RRT Planner</h3>
+            <p style="font-size: 0.95rem;">
+                The platform contains a dedicated 3D Path Planning engine. Bounded by exact kinematic workspace ranges, 
+                the search space is discretized into a 3D occupancy voxel grid. Operator-defined collision perimeters 
+                are calculated, allowing A* algorithms (optimality) and Rapidly-Exploring Random Trees (RRT) to map 
+                collision-free paths.
+            </p>
+        </div>
+        <div style="background: rgba(0, 243, 255, 0.03); padding: 20px; border-radius: 5px; border-left: 4px solid #00f3ff;">
+            <h3 style="color: #00f3ff; margin-bottom: 10px;">💾 Supabase & Local DB Fallback</h3>
+            <p style="font-size: 0.95rem;">
+                All operational mission logs, emergency alerts, calibration curves, and user authentication events 
+                are committed asynchronously via an independent logger thread to Supabase PostgreSQL, keeping the main 
+                server completely unblocked. An offline SQLite fallback triggers automatically to ensure zero loss of telemetry.
+            </p>
+        </div>
     </div>
 </div>
 {% endblock %}

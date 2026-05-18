@@ -2,60 +2,122 @@
 
 {% block title %}Features{% endblock %}
 
-{% block header_title %}SYSTEM CAPABILITIES{% endblock %}
+{% block header_title %}SYSTEM CAPABILITIES & ENGINEERING SPECIFICATIONS{% endblock %}
 
 {% block content %}
 <div class="panel" style="margin-bottom: 30px;">
-    <h2 style="color: #00f3ff; margin-bottom: 20px;">THE MECHANICS & THE MIND</h2>
+    <h2 style="color: #00f3ff; margin-bottom: 20px; letter-spacing: 2px;">THE MECHANICAL ANATOMY & NEURAL MAPPED MIND</h2>
 
-    <div class="spec-section" style="margin-bottom: 25px;">
-        <h3 style="color: #00f3ff;">🛠️ The Hardware: Fluidity & Flexibility</h3>
-        <p style="color: #ddd; line-height: 1.6;">
-            {{ hardware if hardware else 'LUNA is a highly advanced 4-DOF robotic arm designed for precision and fluid
-            movement.' }}
+    <div class="spec-section" style="margin-bottom: 30px; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 25px;">
+        <h3 style="color: #00f3ff; margin-bottom: 15px;">🛠️ Hardware Engineering Specification</h3>
+        <p style="color: #ddd; line-height: 1.8; margin-bottom: 15px;">
+            LUNA's physical chassis is an optimized 4-Degree-of-Freedom (DOF) anthropomorphic manipulator, engineered to match human hand kinematics. 
+            Actuation is handled by low-latency MG996R and DS3218 high-torque metal-geared servos configured across split PCA9685 I2C expansion boards. 
+            To prevent current draw spikes from causing microcontroller brown-outs, a dedicated 5V 10A buck-regulated external power bus supplies the motors directly, 
+            while opto-couplers isolate the high-frequency control lines.
         </p>
+        <table class="hud-table" style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+                <tr style="border-bottom: 2px solid #00f3ff; background: rgba(0,243,255,0.05);">
+                    <th style="padding: 10px; text-align: left; color: #00f3ff;">JOINT ID</th>
+                    <th style="padding: 10px; text-align: left; color: #00f3ff;">FUNCTIONAL ANATOMY</th>
+                    <th style="padding: 10px; text-align: left; color: #00f3ff;">SERVO TYPE</th>
+                    <th style="padding: 10px; text-align: left; color: #00f3ff;">SAFE RANGE LIMITS</th>
+                    <th style="padding: 10px; text-align: left; color: #00f3ff;">BUS ADDRESS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid rgba(0, 243, 255, 0.1);">
+                    <td style="padding: 10px; font-family: monospace; color: #00f3ff;">MOTOR 2</td>
+                    <td style="padding: 10px;">Arm Main Pivot (Base Elevation)</td>
+                    <td style="padding: 10px; font-family: monospace;">DS3218 (20kg-cm)</td>
+                    <td style="padding: 10px; font-family: monospace;">15° - 165°</td>
+                    <td style="padding: 10px; font-family: monospace;">I2C 0x40 [Ch 0]</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(0, 243, 255, 0.1);">
+                    <td style="padding: 10px; font-family: monospace; color: #00f3ff;">MOTOR 3</td>
+                    <td style="padding: 10px;">Elbow Joint Flexion</td>
+                    <td style="padding: 10px; font-family: monospace;">MG996R (12kg-cm)</td>
+                    <td style="padding: 10px; font-family: monospace;">10° - 170°</td>
+                    <td style="padding: 10px; font-family: monospace;">I2C 0x40 [Ch 1]</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(0, 243, 255, 0.1);">
+                    <td style="padding: 10px; font-family: monospace; color: #00f3ff;">MOTOR 4</td>
+                    <td style="padding: 10px;">Wrist Roll & Pitch Pivot</td>
+                    <td style="padding: 10px; font-family: monospace;">MG996R (12kg-cm)</td>
+                    <td style="padding: 10px; font-family: monospace;">0° - 180°</td>
+                    <td style="padding: 10px; font-family: monospace;">I2C 0x40 [Ch 2]</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(0, 243, 255, 0.1);">
+                    <td style="padding: 10px; font-family: monospace; color: #00f3ff;">MOTOR 5-9</td>
+                    <td style="padding: 10px;">Grip / Hand Claw Actuators</td>
+                    <td style="padding: 10px; font-family: monospace;">SG90 Micro Servos</td>
+                    <td style="padding: 10px; font-family: monospace;">0° - 120°</td>
+                    <td style="padding: 10px; font-family: monospace;">I2C 0x41 [Ch 0-4]</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 
     <div class="spec-section">
-        <h3 style="color: #00f3ff;">🧠 The Brain: Powered by Google Gemini</h3>
-        <p style="color: #ddd; line-height: 1.6; white-space: pre-line;">
-            {{ brain if brain else 'Powered by the cutting-edge Google Gemini AI ecosystem for true generative
-            intelligence.' }}
+        <h3 style="color: #00f3ff; margin-bottom: 15px;">🧠 The Neural Brain: Google Gemini 1.5 Pro & Local Voice Uplink</h3>
+        <p style="color: #ddd; line-height: 1.8;">
+            LUNA's semantic comprehension is driven by the Google Gemini API. This allows operators to issue highly abstract voice commands 
+            (e.g., <em>"LUNA, carefully raise the arm and point toward the highest object in view"</em>) which are captured via a persistent 
+            Whisper microphone queue, parsed into actionable angular vectors, and executed. 
+            Furthermore, you can hot-reload LUNA's system directive prompts dynamically inside the dashboard to modify the robot's voice, safety thresholds, or task priorities instantly.
         </p>
     </div>
 </div>
 
-<h2 style="color: #00f3ff; margin-bottom: 20px;">CORE CAPABILITIES</h2>
-<div class="card-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-    <div class="hud-card panel">
-        <h3 style="color: #00f3ff;">👁️ Spatial Vision</h3>
-        <p style="color: #ddd; margin-top: 10px;">RTX 4060 GPU runs YOLOv8 for real-time object detection and MediaPipe
-            for hand-tracking mimicry.</p>
+<h2 style="color: #00f3ff; margin-bottom: 20px; letter-spacing: 2px;">CORE INDUSTRIAL-GRADE CAPABILITIES</h2>
+<div class="card-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+    <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.2);">
+        <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 5px; margin-bottom: 10px;">👁️ Spatial Vision Processor</h3>
+        <p style="color: #bbb; line-height: 1.6;">
+            A multi-threaded Python vision pipeline processes camera frames in parallel, mapping YOLOv8 spatial bounding boxes for 100+ objects 
+            while concurrently running MediaPipe hands to mirror finger flexion in real-time.
+        </p>
     </div>
-    <div class="hud-card panel">
-        <h3 style="color: #00f3ff;">🎮 Teleoperation</h3>
-        <p style="color: #ddd; margin-top: 10px;">Velocity Control logic for Xbox/PS4 controllers—enabling weightless,
-            anti-gravity movement.</p>
+    
+    <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.2);">
+        <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 5px; margin-bottom: 10px;">🛸 Weightless Teleoperation</h3>
+        <p style="color: #bbb; line-height: 1.6;">
+            Integrated Xbox / PlayStation gamepad loop running at 30Hz with dual joysticks mapping to delta-time angle velocities, 
+            allowing fluid control over arm elevation, wrist roll, and finger grip curling.
+        </p>
     </div>
-    <div class="hud-card panel">
-        <h3 style="color: #00f3ff;">🛑 Safety Perimeter</h3>
-        <p style="color: #ddd; margin-top: 10px;">Hardware-level protection with VL53L0X laser sensors. Automatic
-            kill-switch triggers if perimeter is breached.</p>
+
+    <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.2);">
+        <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 5px; margin-bottom: 10px;">🛡️ Safe-Zone Laser Perimeter</h3>
+        <p style="color: #bbb; line-height: 1.6;">
+            An ESP32-governed array of VL53L0X Time-of-Flight laser rangefinders monitors the physical zone around LUNA. 
+            If any object enters within 15cm, the backend halts all commands instantly to ensure operator safety.
+        </p>
     </div>
-    <div class="hud-card panel">
-        <h3 style="color: #00f3ff;">🧠 Gemini AI Integration</h3>
-        <p style="color: #ddd; margin-top: 10px;">Natural language understanding via Google's Gemini API for voice
-            commands and contextual responses.</p>
+
+    <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.2);">
+        <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 5px; margin-bottom: 10px;">🦾 Coordinated Bimanual Operations</h3>
+        <p style="color: #bbb; line-height: 1.6;">
+            Features simultaneous dual-serial connections allowing left and right arm target control over separate COM ports. 
+            Interpolation engines run on both threads to ensure synchronous, jitter-free joint movements.
+        </p>
     </div>
-    <div class="hud-card panel">
-        <h3 style="color: #00f3ff;">📡 Cloud‑Connected</h3>
-        <p style="color: #ddd; margin-top: 10px;">Mission logs and user data stored securely in Supabase (PostgreSQL)
-            for remote monitoring.</p>
+
+    <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.2);">
+        <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 5px; margin-bottom: 10px;">🌐 Digital Twin 3D Splines</h3>
+        <p style="color: #bbb; line-height: 1.6;">
+            WebGL and Three.js-powered digital twin loads your custom LUNA 3D mesh model, matching physical motor degrees in real-time, 
+            complete with dynamic spline path tracers projecting spatial routes.
+        </p>
     </div>
-    <div class="hud-card panel">
-        <h3 style="color: #00f3ff;">🔐 Role‑Based Access</h3>
-        <p style="color: #ddd; margin-top: 10px;">Separate operator and admin privileges with a customizable content
-            management system.</p>
+
+    <div class="hud-card panel" style="background: rgba(0,0,0,0.6); border-color: rgba(0, 243, 255, 0.2);">
+        <h3 style="color: #00f3ff; border-bottom: 1px solid rgba(0, 243, 255, 0.1); padding-bottom: 5px; margin-bottom: 10px;">📋 Secure User Audit Trails</h3>
+        <p style="color: #bbb; line-height: 1.6;">
+            Comprehensive security audit trails track operator actions and login histories, preserving critical telemetry 
+            and command actions with absolute timestamps inside secure PostgreSQL databases.
+        </p>
     </div>
 </div>
 {% endblock %}

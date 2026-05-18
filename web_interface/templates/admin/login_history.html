@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Login History{% endblock %}
+
+{% block header_title %}LOGIN AUDIT TRAIL{% endblock %}
+
+{% block back_button %}
+<div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+        style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+</div>
+{% endblock %}
+
+{% block dashboard_back_button %}
+<div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-small"
+        style="text-decoration: none; padding: 5px 10px; display: inline-block;">← BACK</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <table class="hud-table" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 80px;">ID</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">Operator Username</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 150px;">IP Address</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">User Agent</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 180px;">Timestamp</th>
+                <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 120px;">Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in history %}
+            {% if loop.index0 % 2 == 0 %}
+            <tr style="background: rgba(0, 243, 255, 0.02);">
+            {% else %}
+            <tr style="background: transparent;">
+            {% endif %}
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15);">{{ entry.id }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15);">
+                    {% if entry.user %}
+                        <span style="color: #00f3ff; font-weight: bold;">{{ entry.user.username }}</span>
+                    {% else %}
+                        <span style="color: #ff3e3e;">Unknown Attempt</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15); font-family: monospace;">{{ entry.ip_address }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15); font-size: 0.85em; color: #aaa; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.user_agent }}">{{ entry.user_agent }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15);">{{ entry.login_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid rgba(0,243,255,0.15);">
+                    {% if entry.success %}
+                        <span style="color: #3eff3e; font-weight: bold; text-shadow: 0 0 5px rgba(62,255,62,0.4);">✓ SUCCESS</span>
+                    {% else %}
+                        <span style="color: #ff3e3e; font-weight: bold; text-shadow: 0 0 5px rgba(255,62,62,0.4);">✗ FAILED</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="padding: 30px; text-align: center; color: #888;">No login history entries logged yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if pagination and pagination.pages > 1 %}
+    <div style="display: flex; justify-content: center; margin-top: 20px; gap: 10px;">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for('admin_login_history', page=pagination.prev_num) }}" class="btn btn-small">← PREV</a>
+        {% endif %}
+        <span style="color: #00f3ff; padding: 5px 15px; background: rgba(0,243,255,0.1); border-radius: 4px;">PAGE {{ pagination.page }} OF {{ pagination.pages }}</span>
+        {% if pagination.has_next %}
+            <a href="{{ url_for('admin_login_history', page=pagination.next_num) }}" class="btn btn-small">NEXT →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,7 +1,5 @@
 // app.js – LUNA SPA Controller
 
-const socket = io(); // keep socket connection for real‑time updates
-
 // DOM elements
 const loginSection = document.getElementById('login-section');
 const homeSection = document.getElementById('home-section');
@@ -291,7 +289,7 @@ async function login(username, password) {
 // Logout
 async function logout() {
     await fetch('/api/logout', { method: 'POST' });
-    showGuestLayout();
+    window.location.href = '/';
 }
 
 // Attach login form submit handler

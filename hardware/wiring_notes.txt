@@ -1,0 +1,111 @@
+================================================================================
+                    LUNA ROBOTIC ARM & HAND - MASTER WIRING SCHEMATICS
+================================================================================
+This document provides the exhaustive, pin-by-pin electrical connections and 
+power distribution architecture for the LUNA Robotic Arm & Hand system.
+
+---
+1. CORE HARDWARE COMPONENTS
+---
+- Host: Laptop with RTX 4060 GPU
+- Microcontroller 1: Arduino Mega 2560 R3 (Motor Controller & Sub-system Hub)
+- Microcontroller 2: ESP32 NodeMCU (Time-of-Flight Laser Array & Safety Hub)
+- PWM Co-Processor 1: PCA9685 16-Channel 12-bit PWM Driver (Address: 0x40) [Arm Motors]
+- PWM Co-Processor 2: PCA9685 16-Channel 12-bit PWM Driver (Address: 0x41) [Finger Motors]
+- Actuators:
+  - 1x DS3218 20kg-cm High-Torque Servo (Motor ID 2 - Shoulder Main Elevation)
+  - 1x MG996R 12kg-cm Metal Gear Servo (Motor ID 3 - Elbow Joint Flexion)
+  - 1x MG996R 12kg-cm Metal Gear Servo (Motor ID 4 - Wrist Roll & Pitch)
+  - 5x SG90 9g Micro Servos (Motor IDs 5, 6, 7, 8, 9 - Hand Fingers Curling)
+- Sensors:
+  - 1x VL53L0X laser Time-of-Flight (ToF) Distance Sensor (Safety Perimeter Array)
+- Power Infrastructure:
+  - 1x 5V 10A DC Switch-Mode Power Supply (SMPS) [Actuators Power]
+  - USB 5V Bus [Logic Power for Mega and ESP32]
+
+---
+2. POWER DISTRIBUTION & THE COMMON GROUND RULE (CRITICAL)
+---
+* CAUTION: Never power high-torque servos (MG996R, DS3218) directly from the Arduino Mega 5V pin! 
+  Doing so will cause voltage brown-outs, corrupt memory, and potentially destroy the microcontroller.
+* CRITICAL RULE: The Ground (GND) of the external 5V 10A power supply MUST be physically tied to 
+  the Ground (GND) of the Arduino Mega and ESP32. Without this Common Ground, PWM reference signals 
+  will float, causing servos to jitter violently and fail command execution.
+
+Power Distribution Connections:
+[External 5V 10A SMPS]
+  - V+ (5V Output)  ---> Connected to PCA9685 Board 1 & Board 2 green terminal blocks [V+]
+  - V- (GND Output) ---> Connected to PCA9685 Board 1 & Board 2 green terminal blocks [GND]
+  - V- (GND Output) ---> Connected directly to Arduino Mega GND pin
+  - V- (GND Output) ---> Connected directly to ESP32 GND pin
+
+[Arduino Mega 2560]
+  - USB Type-B Port ---> Connected directly to RTX 4060 Laptop USB Port (Logic Power & Serial)
+  - 5V Pin          ---> Connected to PCA9685 Board 1 & Board 2 logic power pins [VCC]
+  - GND Pin         ---> Connected to PCA9685 Board 1 & Board 2 logic ground pins [GND]
+
+[ESP32 NodeMCU]
+  - Micro-USB Port  ---> Connected directly to RTX 4060 Laptop USB Port (Logic Power & Serial)
+  - 3.3V Pin        ---> Connected to VL53L0X sensor [VIN / VDD]
+  - GND Pin         ---> Connected to VL53L0X sensor [GND]
+
+---
+3. BUS COMMUNICATION WIRING (I2C & SERIAL)
+---
+[Arduino Mega 2560 to PCA9685 Board 1 (Address 0x40 - Arm)]
+  - Pin 20 (SDA)  ---> Connected to PCA9685 Board 1 logic pin [SDA]
+  - Pin 21 (SCL)  ---> Connected to PCA9685 Board 1 logic pin [SCL]
+  - 5V Pin        ---> Connected to PCA9685 Board 1 logic pin [VCC]
+  - GND Pin       ---> Connected to PCA9685 Board 1 logic pin [GND]
+
+[PCA9685 Board 1 (0x40) to PCA9685 Board 2 (0x41 - Hand) - Daisy Chain]
+  - Board 1 [SDA] ---> Connected to Board 2 logic pin [SDA]
+  - Board 1 [SCL] ---> Connected to Board 2 logic pin [SCL]
+  - Board 1 [VCC] ---> Connected to Board 2 logic pin [VCC]
+  - Board 1 [GND] ---> Connected to Board 2 logic pin [GND]
+  * NOTE: To assign address 0x41 to Board 2, bridge the "A0" address pad on Board 2 with solder.
+
+---
+4. ACTUATOR CONTROL CHANNELS
+---
+All servos are plugged directly into the 3-pin headers (GND = Black/Brown, V+ = Red, PWM = Yellow/Orange) 
+on their respective PCA9685 driver boards.
+
+[PCA9685 Board 1 (Address 0x40 - Arm Control)]
+  - Channel 0 ---> DS3218 High-Torque Servo [Motor ID 2 - Shoulder Elevation]
+  - Channel 1 ---> MG996R Servo [Motor ID 3 - Elbow Flexion]
+  - Channel 2 ---> MG996R Servo [Motor ID 4 - Wrist Roll]
+
+[PCA9685 Board 2 (Address 0x41 - Hand Control)]
+  - Channel 0 ---> SG90 Micro Servo [Motor ID 5 - Thumb Curl]
+  - Channel 1 ---> SG90 Micro Servo [Motor ID 6 - Index Finger Curl]
+  - Channel 2 ---> SG90 Micro Servo [Motor ID 7 - Middle Finger Curl]
+  - Channel 3 ---> SG90 Micro Servo [Motor ID 8 - Ring Finger Curl]
+  - Channel 4 ---> SG90 Micro Servo [Motor ID 9 - Little Finger Curl]
+
+---
+5. SAFETY SENSOR WIRING (VL53L0X Time-of-Flight Array)
+---
+The ESP32 reads the high-speed laser distance sensors over its dedicated I2C bus.
+
+[ESP32 NodeMCU to VL53L0X Sensor]
+  - Pin 3.3V (Out) ---> Connected to VL53L0X [VIN / VCC] (Power)
+  - Pin GND        ---> Connected to VL53L0X [GND]       (Ground)
+  - Pin GPIO 21    ---> Connected to VL53L0X [SDA]       (I2C Data)
+  - Pin GPIO 22    ---> Connected to VL53L0X [SCL]       (I2C Clock)
+
+---
+6. DIAGNOSTIC SIGNAL FLOW DIAGRAM
+---
+               [ RTX 4060 Laptop (Orchestrator) ]
+                 /                            \
+      USB Serial / (COM3)                      \ USB Serial (COM4)
+                v                               v
+       [ Arduino Mega ]                     [ ESP32 Hub ]
+         |         |                              |
+     I2C | 0x40    | I2C 0x41                     | I2C Bus
+         v         v                              v
+    [PCA9685 1]  [PCA9685 2]                 [VL53L0X Laser]
+      /   |   \    |   |   |   |   \               (Safety Area)
+     M2  M3   M4   M5  M6  M7  M8  M9
+================================================================================

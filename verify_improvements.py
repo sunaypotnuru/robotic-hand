@@ -16,7 +16,7 @@ def print_header(text):
 
 def print_result(test_name, passed, message=""):
     """Print test result"""
-    status = "✅ PASS" if passed else "❌ FAIL"
+    status = "[PASS]" if passed else "[FAIL]"
     print(f"{status} - {test_name}")
     if message:
         print(f"       {message}")
@@ -136,10 +136,10 @@ def main():
     # Check 6: Documentation
     print_header("6. Documentation")
     docs = [
-        'PATH1_COMPLETE.md',
-        'PATH2_COMPLETE.md',
-        'IMPLEMENTATION_COMPLETE.md',
-        'START_HERE.md'
+        'README.md',
+        'FEATURES.md',
+        'INSTALLATION.md',
+        'CLEANUP_REPORT.md'
     ]
     for doc in docs:
         total_tests += 1
@@ -173,14 +173,14 @@ def main():
     print(f"\nSuccess Rate: {percentage:.1f}%")
     
     if percentage == 100:
-        print("\n🎉 ALL CHECKS PASSED! Your improvements are complete!")
-        print("✅ Ready for production deployment")
+        print("\n[SUCCESS] ALL CHECKS PASSED! Your improvements are complete!")
+        print("Ready for production deployment")
         return 0
     elif percentage >= 90:
-        print("\n⚠️  Most checks passed. Review failed items above.")
+        print("\n[WARNING] Most checks passed. Review failed items above.")
         return 1
     else:
-        print("\n❌ Several checks failed. Please review and fix.")
+        print("\n[ERROR] Several checks failed. Please review and fix.")
         return 1
 
 if __name__ == '__main__':

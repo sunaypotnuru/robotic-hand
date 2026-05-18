@@ -39,19 +39,107 @@ let lastTwinUpdateTime = 0;
 const TWIN_UPDATE_INTERVAL = 100; // 10Hz update rate
 let twinEnabled = true;
 
+// ==================== UTILITY: MJPEG STREAM THROTTLING ====================
+function throttleCameraFeed(active) {
+    const videoFeed = document.getElementById('video-feed');
+    if (videoFeed) {
+        if (active) {
+            // Restore active feed
+            videoFeed.src = "/video_feed";
+            console.log("📹 Camera Feed Restored (Active Dashboard)");
+        } else {
+            // Shut down network socket feed by setting to empty
+            videoFeed.src = "";
+            console.log("💤 Camera Feed Throttled (Off-Dashboard)");
+        }
+    }
+}
+
+// ==================== UTILITY: MOBILE SIDEBAR & A11Y SETUP ====================
+function setupResponsiveSidebarAndA11y() {
+    // Add floating hamburger menu for mobile screens
+    if (!document.getElementById('sidebar-toggle')) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.id = 'sidebar-toggle';
+        toggleBtn.innerHTML = '☰';
+        toggleBtn.style.cssText = `
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1100;
+            background: rgba(10, 10, 10, 0.9);
+            border: 2px solid #00f3ff;
+            border-radius: 5px;
+            color: #00f3ff;
+            font-size: 1.5rem;
+            padding: 2px 10px;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+        `;
+        document.body.appendChild(toggleBtn);
+
+        const sidebar = document.querySelector('.sidebar');
+        
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sidebar) {
+                sidebar.classList.toggle('active');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (sidebar && sidebar.classList.contains('active') && !sidebar.contains(e.target) && e.target !== toggleBtn) {
+                sidebar.classList.remove('active');
+            }
+        });
+
+        // Add dynamic CSS rules for mobile responsiveness
+        const style = document.createElement('style');
+        style.id = 'sidebar-mobile-responsive-styles';
+        style.textContent = `
+            @media (max-width: 768px) {
+                #sidebar-toggle {
+                    display: block !important;
+                }
+                .sidebar {
+                    transform: translateX(-100%);
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .sidebar.active {
+                    transform: translateX(0);
+                }
+                .main-content.with-sidebar {
+                    margin-left: 0 !important;
+                    width: 100% !important;
+                    padding-top: 70px !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Set accessibility live attributes dynamically on speech elements
+    ['robot-speech', 'robot-speech-settings', 'robot-speech-diag'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.setAttribute('aria-live', 'polite');
+        }
+    });
+}
+
 // Initialize based on active page
 document.addEventListener('DOMContentLoaded', () => {
     initSocketIO();
-
-    // The router.js will now call initDashboard(), initSettings(), etc., when pages are shown.
-    // However, if a user directly loads /settings, the router should handle it.
-
     initSidebar(); // Still run initially to set up styling
+    setupResponsiveSidebarAndA11y();
 });
 
 // ==================== PAGE INITIALIZERS ====================
 
 window.initDashboard = function() {
+    throttleCameraFeed(true);
+
     if (document.getElementById('telemetry-chart')) {
         initTelemetryChart();
     }
@@ -63,19 +151,70 @@ window.initDashboard = function() {
 };
 
 window.initSettings = function() {
+    throttleCameraFeed(false);
     initSettingsControls();
 };
 
 window.initDiagnostics = function() {
+    throttleCameraFeed(false);
     initCalibrationControls();
 };
 
 window.initLogs = async function() {
-    // Basic init if we were to fetch logs via AJAX
+    throttleCameraFeed(false);
+    // Initialize or refresh mission logs asynchronously if needed
+    const tableBody = document.getElementById('logs-table-body');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = `<tr><td colspan="3" style="padding: 20px; text-align: center; color: #00f3ff;">CONNECTING TO CORE DATAFEED...</td></tr>`;
+    try {
+        const res = await fetch('/api/logs?page=1&per_page=15');
+        const data = await res.json();
+        
+        if (!data.logs || data.logs.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="3" style="padding: 20px; text-align: center; color: #666;">No recorded mission entries.</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = '';
+        data.logs.forEach(log => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid rgba(0, 243, 255, 0.1)';
+            const formattedTime = new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19);
+
+            tr.innerHTML = `
+                <td style="padding: 12px; color: #aaa; font-family: monospace;">${formattedTime}</td>
+                <td style="padding: 12px; color: #00f3ff; font-weight: bold; font-family: monospace;">${log.command}</td>
+                <td style="padding: 12px; color: #fff; font-family: monospace; font-size: 0.85rem; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title='${JSON.stringify(log.robot_state)}'>
+                    ${JSON.stringify(log.robot_state)}
+                </td>
+            `;
+            tableBody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Failed to load logs:", e);
+        tableBody.innerHTML = `<tr><td colspan="3" style="padding: 20px; text-align: center; color: #ff0055;">ERROR RETRIEVING MISSION DATA</td></tr>`;
+    }
 };
 
 window.initProfile = function() {
-    // Static after login, no specific init needed for now
+    throttleCameraFeed(false);
+    // Fetch and populate profile if elements exist
+    const nameEl = document.getElementById('profile-name');
+    if (nameEl && nameEl.textContent === 'Operator Name') {
+        fetch('/api/profile')
+            .then(res => res.json())
+            .then(user => {
+                if (user.full_name) nameEl.textContent = user.full_name;
+                const roleEl = document.getElementById('profile-role');
+                if (roleEl && user.role) roleEl.textContent = user.role.toUpperCase();
+                const bioEl = document.getElementById('profile-bio');
+                if (bioEl && user.bio) bioEl.textContent = user.bio;
+                const usernameEl = document.getElementById('profile-username');
+                if (usernameEl && user.username) usernameEl.textContent = user.username;
+            })
+            .catch(err => console.error("Operator Profile Sync Offline:", err));
+    }
 };
 
 // ==================== SIDEBAR ====================
@@ -377,12 +516,17 @@ function initVirtualJoystick() {
     const zone = document.getElementById('joystick-zone');
     if (!zone) return;
 
+    // Support responsive scaling on mobile/touch interfaces
+    const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const joystickSize = isTouch ? 150 : 100;
+    const joystickMode = isTouch ? 'dynamic' : 'static';
+
     const inst = nipplejs.create({
         zone: zone,
-        mode: 'static',
-        position: { left: '50%', top: '50%' },
+        mode: joystickMode,
+        position: isTouch ? undefined : { left: '50%', top: '50%' },
         color: '#00f3ff',
-        size: 100
+        size: joystickSize
     });
 
     inst.on('move', (evt, data) => {
@@ -414,6 +558,8 @@ function initSettingsControls() {
 
 // ==================== DIAGNOSTICS LOGIC ====================
 
+let throttleTimeouts = {};
+
 function initCalibrationControls() {
     for (let i = 2; i <= 9; i++) {
         const slider = document.getElementById(`motor-${i}-diag`);
@@ -422,7 +568,16 @@ function initCalibrationControls() {
             slider.addEventListener('input', (e) => {
                 const angle = parseInt(e.target.value);
                 if (valueEl) valueEl.textContent = angle;
-                socket.emit('motor_command', { motor_id: i, angle: angle });
+                
+                // Add a robust 40ms input rate limiter (25Hz update cap)
+                if (!throttleTimeouts[i]) {
+                    throttleTimeouts[i] = true;
+                    setTimeout(() => {
+                        throttleTimeouts[i] = false;
+                    }, 40);
+
+                    socket.emit('motor_command', { motor_id: i, angle: angle });
+                }
             });
         }
     }

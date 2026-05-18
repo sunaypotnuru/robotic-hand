@@ -22,6 +22,11 @@
             <span class="nav-icon">🛠️</span>
             <span>DIAGNOSTICS</span>
         </a>
+        <a href="/login-history" class="nav-item {% if request.endpoint == 'login_history' %}active{% endif %}"
+            id="side-nav-login-history">
+            <span class="nav-icon">🛡️</span>
+            <span>AUDIT TRAIL</span>
+        </a>
         {% if current_user.role == 'admin' %}
         <div class="nav-divider" style="height: 1px; background: rgba(255, 0, 153, 0.4); margin: 10px 0;"></div>
         <a href="/admin"

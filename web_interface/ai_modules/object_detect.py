@@ -1,17 +1,16 @@
 """
 LUNA Object Detection Module
-YOLOv8 for Object Tracking and Click-to-Pick
+YOLOv8 for Object Tracking and Click-to-Pick with TensorRT GPU Acceleration
 """
 
 import cv2
 import numpy as np
 import threading
 import os
+import torch
 
-# Resolve YOLO model path relative to this file's directory so the app
-# can be started from any working directory.
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_DEFAULT_MODEL = os.path.join(_BASE_DIR, '..', '..', 'models', 'yolov8m.pt')
+_DEFAULT_MODEL = os.path.join(_BASE_DIR, '..', '..', 'models', 'yolov8x.pt')
 
 
 class ObjectDetector:
@@ -34,19 +33,45 @@ class ObjectDetector:
         self.model = None
         self.detections = []
         self.lock = threading.Lock()
+        self.frame_counter = 0
+        self.last_annotated_frame = None
         
         try:
             from ultralytics import YOLO
-            # Load YOLOv8 model (will download if not found)
-            self.model = YOLO(model_path)
-            print(f"✅ YOLOv8 model loaded: {model_path}")
+            
+            # Detect GPU / CUDA capability
+            device = 0 if torch.cuda.is_available() else 'cpu'
+            engine_path = model_path.replace('.pt', '.engine')
+            
+            if device == 0:
+                # If engine file does not exist, attempt to export it for GPU acceleration
+                if not os.path.exists(engine_path) and model_path.endswith('.pt') and os.path.exists(model_path):
+                    try:
+                        print("🚀 Exporting YOLOv8 model to TensorRT engine format on GPU...")
+                        temp_model = YOLO(model_path)
+                        temp_model.export(format='engine', device=0)
+                    except Exception as ex:
+                        print(f"⚠️  TensorRT Export failed: {ex}")
+                
+                if os.path.exists(engine_path):
+                    try:
+                        self.model = YOLO(engine_path)
+                        model_path = engine_path
+                        print(f"🚀 Loading TensorRT GPU accelerated engine: {model_path}")
+                    except Exception as te:
+                        print(f"⚠️ TensorRT Engine loading failed: {te}, falling back to standard PyTorch model")
+            
+            if self.model is None:
+                # Load the PyTorch fallback model
+                self.model = YOLO(model_path)
+            print(f"✅ YOLOv8 model loaded: {model_path} (on {device if device == 'cpu' else 'GPU:0'})")
         except Exception as e:
             print(f"⚠️  YOLOv8 initialization error: {e}")
             print("   Running without object detection")
     
     def process_frame(self, frame):
         """
-        Process frame with YOLOv8 and draw bounding boxes
+        Process frame with YOLOv8 and draw bounding boxes (w/ Frame Skipping O1)
         
         Args:
             frame: Input BGR frame
@@ -57,8 +82,14 @@ class ObjectDetector:
         if self.model is None:
             return frame
         
+        self.frame_counter += 1
+        
+        # Frame Skipping (Process every 3rd frame - O1)
+        if self.frame_counter % 3 != 0 and self.last_annotated_frame is not None:
+            return self.last_annotated_frame
+        
         try:
-            # Run YOLOv8 inference
+            # Run YOLOv8 inference (forces CUDA/GPU execution if device engine is loaded)
             results = self.model(frame, verbose=False, conf=self.confidence_threshold)
             
             # Extract detections
@@ -107,10 +138,11 @@ class ObjectDetector:
                              (detection['center'][0], detection['center'][1]),
                              5, (255, 0, 0), -1)
             
-            # Update detections
+            # Update detections in a thread-safe manner
             with self.lock:
                 self.detections = detections
             
+            self.last_annotated_frame = annotated_frame
             return annotated_frame
             
         except Exception as e:
@@ -144,22 +176,23 @@ class ObjectDetector:
                     return detection
         return None
     
-    def get_normalized_position(self, detection):
+    def get_normalized_position(self, detection, frame_width=640, frame_height=480):
         """
-        Get normalized position (0-1) of detection center
+        Get normalized position (0-1) of detection center (Resolved O2)
         
         Args:
             detection: Detection dictionary
+            frame_width: Bounding frame width
+            frame_height: Bounding frame height
             
         Returns:
             (x_normalized, y_normalized) or None
+        ```
         """
         if detection is None:
             return None
         
-        # This would need frame dimensions - simplified for now
-        # In practice, pass frame dimensions to this method
         center = detection['center']
-        # Normalized coordinates would be: (center_x / frame_width, center_y / frame_height)
-        return center
-
+        x_norm = float(center[0]) / max(1.0, float(frame_width))
+        y_norm = float(center[1]) / max(1.0, float(frame_height))
+        return x_norm, y_norm

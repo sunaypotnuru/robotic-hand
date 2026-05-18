@@ -8,18 +8,18 @@ load_dotenv()
 
 def bootstrap():
     with app.app_context():
-        print("🛠️  LUNA Administrative Bootstrapper")
+        print("[SETUP] LUNA Administrative Bootstrapper")
         
         # 1. Create Tables
         db.create_all()
-        print("✅ Database tables created.")
+        print("[SUCCESS] Database tables created.")
 
         # 2. Create Admin User from environment variables
         admin_email = os.getenv('ADMIN_EMAIL', 'admin@luna.local')
         admin_password = os.getenv('ADMIN_PASSWORD')
         
         if not admin_password:
-            print("❌ ERROR: ADMIN_PASSWORD not set in .env file")
+            print("[ERROR] ADMIN_PASSWORD not set in .env file")
             print("   Please create a .env file with ADMIN_PASSWORD=your-secure-password")
             return
         
@@ -28,11 +28,11 @@ def bootstrap():
             new_admin = User(username=admin_email, role='admin')
             new_admin.set_password(admin_password)
             db.session.add(new_admin)
-            print(f"✅ Admin user created: {admin_email}")
+            print(f"[SUCCESS] Admin user created: {admin_email}")
             print(f"   Password: (stored securely from .env)")
         else:
             admin_user.set_password(admin_password)
-            print(f"✅ Admin user {admin_email} already exists. Password updated to match .env")
+            print(f"[SUCCESS] Admin user {admin_email} already exists. Password updated to match .env")
 
         # 3. Populate Initial CMS Content
         initial_content = {
@@ -48,7 +48,7 @@ def bootstrap():
             if not SiteContent.query.filter_by(page_section=section).first():
                 db.session.add(SiteContent(page_section=section, content_text=content))
         
-        print("✅ Initial CMS content populated.")
+        print("[SUCCESS] Initial CMS content populated.")
 
         # 4. Create Initial Team Members
         if not TeamMember.query.first():
@@ -58,10 +58,10 @@ def bootstrap():
                 TeamMember(name="Vamsi", role="Firmware Engineer", bio="ESP32 and Arduino logic designer.")
             ]
             db.session.add_all(members)
-            print("✅ Initial team members added.")
+            print("[SUCCESS] Initial team members added.")
 
         db.session.commit()
-        print("\n🚀 LUNA System Ready. Run 'python app.py' to start.")
+        print("\n[SUCCESS] LUNA System Ready. Run 'python app.py' to start.")
 
 if __name__ == "__main__":
     bootstrap()

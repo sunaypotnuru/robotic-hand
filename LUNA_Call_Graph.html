@@ -1,0 +1,1797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LUNA - Codebase Call Graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #050505; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; }
+  #header { padding: 12px 24px; background: rgba(0,243,255,0.05); border-bottom: 1px solid rgba(0,243,255,0.2); display:flex; justify-content:space-between; align-items:center; }
+  #header h1 { color: #00f3ff; font-size: 1.2rem; letter-spacing: 4px; }
+  #header p { color: #888; font-size: 0.8rem; }
+  #legend { display:flex; gap:15px; font-size:0.72rem; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:5px; }
+  #mynetwork { width: 100vw; height: calc(100vh - 56px); background: #080808; }
+  #tooltip { position:fixed; top:10px; right:10px; background:rgba(0,0,0,0.85); border:1px solid #00f3ff; padding:10px 15px; border-radius:6px; font-size:0.8rem; color:#aaa; max-width:280px; display:none; }
+  #stats { position:fixed; bottom:10px; left:10px; background:rgba(0,0,0,0.7); border:1px solid rgba(0,243,255,0.2); padding:8px 14px; border-radius:4px; font-size:0.75rem; color:#555; }
+</style>
+</head>
+<body>
+<div id="header">
+  <div>
+    <h1>&#129302; LUNA — CODEBASE CALL GRAPH</h1>
+    <p>79 nodes &bull; 94 edges &bull; Scroll to zoom &bull; Drag to pan &bull; Click node for details</p>
+  </div>
+  <div id="legend">
+    <span><span class="dot" style="background:#00f3ff"></span>app.py</span>
+    <span><span class="dot" style="background:#ff6b6b"></span>gesture</span>
+    <span><span class="dot" style="background:#ffa500"></span>hand_detect</span>
+    <span><span class="dot" style="background:#ffcc44"></span>hand_track</span>
+    <span><span class="dot" style="background:#00ff88"></span>voice</span>
+    <span><span class="dot" style="background:#ff00ff"></span>kinematics</span>
+    <span><span class="dot" style="background:#ffff00"></span>motion</span>
+    <span><span class="dot" style="background:#ff4444"></span>object_detect</span>
+    <span><span class="dot" style="background:#44aaff"></span>validators</span>
+  </div>
+</div>
+<div id="mynetwork"></div>
+<div id="tooltip"><b id="tip-title" style="color:#00f3ff"></b><br><span id="tip-body"></span></div>
+<div id="stats">LUNA Robotic Arm &bull; code2flow analysis &bull; Python call graph</div>
+
+<script>
+const graphData = {
+  "nodes": [
+    {
+      "id": "node_644ac9a3",
+      "label": "(global)()",
+      "title": "app::(global)",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_e6cc1d77",
+      "label": "check_password()",
+      "title": "app::User.check_password",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_ed603feb",
+      "label": "set_password()",
+      "title": "app::User.set_password",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_e9eaf645",
+      "label": "admin_team_add()",
+      "title": "app::admin_team_add",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_9acc1fc4",
+      "label": "admin_team_edit()",
+      "title": "app::admin_team_edit",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_234ff7aa",
+      "label": "admin_user_add()",
+      "title": "app::admin_user_add",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_09b2abae",
+      "label": "admin_user_edit()",
+      "title": "app::admin_user_edit",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_d9355d17",
+      "label": "allowed_file()",
+      "title": "app::allowed_file",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_33e18f5a",
+      "label": "api_login()",
+      "title": "app::api_login",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_af6400a3",
+      "label": "command_execution_loop()",
+      "title": "app::command_execution_loop",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_e0d545c3",
+      "label": "emergency_stop()",
+      "title": "app::emergency_stop",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_234f03ec",
+      "label": "find_arduino_port()",
+      "title": "app::find_arduino_port",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_df9b8a7b",
+      "label": "generate_frames()",
+      "title": "app::generate_frames",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_a2230a57",
+      "label": "handle_batch_command()",
+      "title": "app::handle_batch_command",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_9f258730",
+      "label": "handle_delete_recording()",
+      "title": "app::handle_delete_recording",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_105eb40e",
+      "label": "handle_emergency_stop()",
+      "title": "app::handle_emergency_stop",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_0397b7b9",
+      "label": "handle_gamepad_data()",
+      "title": "app::handle_gamepad_data",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_c9d4fc87",
+      "label": "handle_gesture_update()",
+      "title": "app::handle_gesture_update",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_c731a1b6",
+      "label": "handle_home()",
+      "title": "app::handle_home",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_d996908c",
+      "label": "handle_joystick()",
+      "title": "app::handle_joystick",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_97c994e0",
+      "label": "handle_list_recordings()",
+      "title": "app::handle_list_recordings",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_bd728d73",
+      "label": "handle_motor_command()",
+      "title": "app::handle_motor_command",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_2e4aab2b",
+      "label": "handle_object_click()",
+      "title": "app::handle_object_click",
+      "color": {
+        "background": "#ff4444",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_1ba95ca4",
+      "label": "handle_playback_sequence()",
+      "title": "app::handle_playback_sequence",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_412d491d",
+      "label": "handle_start_recording()",
+      "title": "app::handle_start_recording",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_3ee77f9d",
+      "label": "handle_stop_recording()",
+      "title": "app::handle_stop_recording",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_56f751e3",
+      "label": "handle_toggle_voice()",
+      "title": "app::handle_toggle_voice",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_ecc05851",
+      "label": "home_position()",
+      "title": "app::home_position",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_83dac534",
+      "label": "init_ai_modules()",
+      "title": "app::init_ai_modules",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_2db2c5af",
+      "label": "init_serial_connection()",
+      "title": "app::init_serial_connection",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_1fe848df",
+      "label": "log_mission()",
+      "title": "app::log_mission",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_b2a1b160",
+      "label": "playback_sequence_thread()",
+      "title": "app::playback_sequence_thread",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_333a0803",
+      "label": "send_batch_commands()",
+      "title": "app::send_batch_commands",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_2394c2ba",
+      "label": "send_motor_command()",
+      "title": "app::send_motor_command",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_86659a63",
+      "label": "serial_reader_thread()",
+      "title": "app::serial_reader_thread",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_87c66975",
+      "label": "set_motor()",
+      "title": "app::set_motor",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_861c4109",
+      "label": "video_feed()",
+      "title": "app::video_feed",
+      "color": {
+        "background": "#00f3ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_aebcc06c",
+      "label": "_is_closed_fist()",
+      "title": "gesture_classifier::GestureClassifier._is_closed_fist",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_eead8d8c",
+      "label": "_is_open_palm()",
+      "title": "gesture_classifier::GestureClassifier._is_open_palm",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_6091b1f9",
+      "label": "_is_peace_sign()",
+      "title": "gesture_classifier::GestureClassifier._is_peace_sign",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_26656eec",
+      "label": "_is_pointing()",
+      "title": "gesture_classifier::GestureClassifier._is_pointing",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_e72da347",
+      "label": "_is_thumbs_up()",
+      "title": "gesture_classifier::GestureClassifier._is_thumbs_up",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_ee4bf3ab",
+      "label": "_is_wave()",
+      "title": "gesture_classifier::GestureClassifier._is_wave",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_52c9593a",
+      "label": "classify()",
+      "title": "gesture_classifier::GestureClassifier.classify",
+      "color": {
+        "background": "#ff6b6b",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_733aa7df",
+      "label": "_draw_detections()",
+      "title": "hand_detect::HandDetector._draw_detections",
+      "color": {
+        "background": "#ffa500",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_81a43c24",
+      "label": "_draw_hand()",
+      "title": "hand_detect::HandDetector._draw_hand",
+      "color": {
+        "background": "#ffa500",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_ddd24ff3",
+      "label": "process_frame()",
+      "title": "hand_detect::HandDetector.process_frame",
+      "color": {
+        "background": "#ffa500",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_1495f607",
+      "label": "__init__()",
+      "title": "hand_tracking::HandTracker.__init__",
+      "color": {
+        "background": "#ffcc44",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_88670e3e",
+      "label": "_calculate_finger_folds()",
+      "title": "hand_tracking::HandTracker._calculate_finger_folds",
+      "color": {
+        "background": "#ffcc44",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_83a0a65d",
+      "label": "get_gestures()",
+      "title": "hand_tracking::HandTracker.get_gestures",
+      "color": {
+        "background": "#ffcc44",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_2fb49d45",
+      "label": "process_frame()",
+      "title": "hand_tracking::HandTracker.process_frame",
+      "color": {
+        "background": "#ffcc44",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_62ffa881",
+      "label": "__init__()",
+      "title": "kinematics::SimpleKinematics.__init__",
+      "color": {
+        "background": "#ff00ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_ec6958cd",
+      "label": "image_y_to_angle()",
+      "title": "kinematics::SimpleKinematics.image_y_to_angle",
+      "color": {
+        "background": "#ff00ff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_029a98c0",
+      "label": "(global)()",
+      "title": "motion_recorder::(global)",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_58162a4f",
+      "label": "__init__()",
+      "title": "motion_recorder::MotionRecorder.__init__",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_cd14b4f5",
+      "label": "delete_recording()",
+      "title": "motion_recorder::MotionRecorder.delete_recording",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_bb263f5c",
+      "label": "list_recordings()",
+      "title": "motion_recorder::MotionRecorder.list_recordings",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_6ac3ade6",
+      "label": "load_sequence()",
+      "title": "motion_recorder::MotionRecorder.load_sequence",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_8fd62b0e",
+      "label": "record_frame()",
+      "title": "motion_recorder::MotionRecorder.record_frame",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_36e3dd78",
+      "label": "save_sequence()",
+      "title": "motion_recorder::MotionRecorder.save_sequence",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_33e3aec0",
+      "label": "start_recording()",
+      "title": "motion_recorder::MotionRecorder.start_recording",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_cc34acac",
+      "label": "stop_recording()",
+      "title": "motion_recorder::MotionRecorder.stop_recording",
+      "color": {
+        "background": "#ffff00",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_d19b728e",
+      "label": "__init__()",
+      "title": "object_detect::ObjectDetector.__init__",
+      "color": {
+        "background": "#ff4444",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_d306b8f2",
+      "label": "process_frame()",
+      "title": "object_detect::ObjectDetector.process_frame",
+      "color": {
+        "background": "#ff4444",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_58cc60a0",
+      "label": "(global)()",
+      "title": "validators::(global)",
+      "color": {
+        "background": "#44aaff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_16e215a5",
+      "label": "sanitize_string()",
+      "title": "validators::InputValidator.sanitize_string",
+      "color": {
+        "background": "#44aaff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_354f8b59",
+      "label": "validate_batch_command()",
+      "title": "validators::InputValidator.validate_batch_command",
+      "color": {
+        "background": "#44aaff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_879c0f34",
+      "label": "validate_motor_command()",
+      "title": "validators::InputValidator.validate_motor_command",
+      "color": {
+        "background": "#44aaff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_89578cdc",
+      "label": "validate_recording_name()",
+      "title": "validators::InputValidator.validate_recording_name",
+      "color": {
+        "background": "#44aaff",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_21dd383f",
+      "label": "(global)()",
+      "title": "voice_cmd::(global)",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_556d5c95",
+      "label": "__init__()",
+      "title": "voice_cmd::VoiceCommandProcessor.__init__",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_01e70b2a",
+      "label": "basic_parse_command()",
+      "title": "voice_cmd::VoiceCommandProcessor.basic_parse_command",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_21d917ba",
+      "label": "get_command()",
+      "title": "voice_cmd::VoiceCommandProcessor.get_command",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_566502da",
+      "label": "init_tts()",
+      "title": "voice_cmd::VoiceCommandProcessor.init_tts",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_f9537021",
+      "label": "listen_loop()",
+      "title": "voice_cmd::VoiceCommandProcessor.listen_loop",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_43d9804a",
+      "label": "process_ai_command()",
+      "title": "voice_cmd::VoiceCommandProcessor.process_ai_command",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_1070de1e",
+      "label": "speak()",
+      "title": "voice_cmd::VoiceCommandProcessor.speak",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_9344a98f",
+      "label": "start_listening()",
+      "title": "voice_cmd::VoiceCommandProcessor.start_listening",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    },
+    {
+      "id": "node_fe8dfc87",
+      "label": "stop_listening()",
+      "title": "voice_cmd::VoiceCommandProcessor.stop_listening",
+      "color": {
+        "background": "#00ff88",
+        "border": "#111",
+        "highlight": {
+          "background": "#fff"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "node_644ac9a3",
+      "to": "node_ecc05851",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_644ac9a3",
+      "to": "node_2db2c5af",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_644ac9a3",
+      "to": "node_62ffa881",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_644ac9a3",
+      "to": "node_58162a4f",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_e9eaf645",
+      "to": "node_d9355d17",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_9acc1fc4",
+      "to": "node_d9355d17",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_234ff7aa",
+      "to": "node_ed603feb",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_09b2abae",
+      "to": "node_ed603feb",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_33e18f5a",
+      "to": "node_e6cc1d77",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_e0d545c3",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_ecc05851",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_83a0a65d",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_ec6958cd",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_21d917ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_1070de1e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_af6400a3",
+      "to": "node_1070de1e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_e0d545c3",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_df9b8a7b",
+      "to": "node_1495f607",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_df9b8a7b",
+      "to": "node_2fb49d45",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_df9b8a7b",
+      "to": "node_d19b728e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_df9b8a7b",
+      "to": "node_d306b8f2",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_a2230a57",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_9f258730",
+      "to": "node_cd14b4f5",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_105eb40e",
+      "to": "node_e0d545c3",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_0397b7b9",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_0397b7b9",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_0397b7b9",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_0397b7b9",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_0397b7b9",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_c9d4fc87",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_c731a1b6",
+      "to": "node_ecc05851",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_d996908c",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_d996908c",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_97c994e0",
+      "to": "node_bb263f5c",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_bd728d73",
+      "to": "node_1fe848df",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_bd728d73",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_2e4aab2b",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_1ba95ca4",
+      "to": "node_6ac3ade6",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_412d491d",
+      "to": "node_33e3aec0",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_3ee77f9d",
+      "to": "node_36e3dd78",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_3ee77f9d",
+      "to": "node_cc34acac",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_56f751e3",
+      "to": "node_9344a98f",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_56f751e3",
+      "to": "node_fe8dfc87",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_ecc05851",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_83dac534",
+      "to": "node_1495f607",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_83dac534",
+      "to": "node_d19b728e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_83dac534",
+      "to": "node_556d5c95",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_2db2c5af",
+      "to": "node_234f03ec",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_b2a1b160",
+      "to": "node_333a0803",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_333a0803",
+      "to": "node_1fe848df",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_2394c2ba",
+      "to": "node_1fe848df",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_2394c2ba",
+      "to": "node_8fd62b0e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_86659a63",
+      "to": "node_e0d545c3",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_87c66975",
+      "to": "node_2394c2ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_861c4109",
+      "to": "node_df9b8a7b",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_52c9593a",
+      "to": "node_aebcc06c",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_52c9593a",
+      "to": "node_eead8d8c",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_52c9593a",
+      "to": "node_6091b1f9",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_52c9593a",
+      "to": "node_26656eec",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_52c9593a",
+      "to": "node_e72da347",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_52c9593a",
+      "to": "node_ee4bf3ab",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_733aa7df",
+      "to": "node_81a43c24",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_ddd24ff3",
+      "to": "node_733aa7df",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_ddd24ff3",
+      "to": "node_81a43c24",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_2fb49d45",
+      "to": "node_88670e3e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_58162a4f",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_bb263f5c",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_6ac3ade6",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_8fd62b0e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_36e3dd78",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_33e3aec0",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_029a98c0",
+      "to": "node_cc34acac",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_16e215a5",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_354f8b59",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_879c0f34",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_879c0f34",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_879c0f34",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_89578cdc",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_58cc60a0",
+      "to": "node_89578cdc",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_21dd383f",
+      "to": "node_556d5c95",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_21dd383f",
+      "to": "node_21d917ba",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_21dd383f",
+      "to": "node_1070de1e",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_21dd383f",
+      "to": "node_9344a98f",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_556d5c95",
+      "to": "node_566502da",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_f9537021",
+      "to": "node_43d9804a",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_43d9804a",
+      "to": "node_01e70b2a",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    },
+    {
+      "from": "node_43d9804a",
+      "to": "node_01e70b2a",
+      "arrows": "to",
+      "color": {
+        "color": "rgba(0,243,255,0.4)"
+      }
+    }
+  ]
+};
+const container = document.getElementById('mynetwork');
+
+const data = {
+  nodes: new vis.DataSet(graphData.nodes),
+  edges: new vis.DataSet(graphData.edges)
+};
+
+const options = {
+  layout: { improvedLayout: true, hierarchical: { enabled: false } },
+  physics: {
+    enabled: true,
+    barnesHut: { gravitationalConstant: -4000, springLength: 140, damping: 0.3 },
+    stabilization: { iterations: 200 }
+  },
+  nodes: {
+    shape: 'box',
+    size: 22,
+    font: { color: '#fff', size: 11, face: 'Courier New' },
+    borderWidth: 1.5,
+    shadow: { enabled: true, color: 'rgba(0,243,255,0.4)', size: 8 }
+  },
+  edges: {
+    smooth: { type: 'curvedCW', roundness: 0.1 },
+    width: 1.2,
+    selectionWidth: 3
+  },
+  interaction: { hover: true, tooltipDelay: 200, navigationButtons: false, keyboard: true },
+  groups: {}
+};
+
+const network = new vis.Network(container, data, options);
+
+network.on('click', function(params) {
+  const tip = document.getElementById('tooltip');
+  if (params.nodes.length > 0) {
+    const n = graphData.nodes.find(x => x.id === params.nodes[0]);
+    if (n) {
+      document.getElementById('tip-title').textContent = n.label;
+      document.getElementById('tip-body').textContent = 'Module: ' + (n.title || '');
+      tip.style.display = 'block';
+    }
+  } else {
+    tip.style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>

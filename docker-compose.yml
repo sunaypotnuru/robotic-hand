@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  luna-robotic-arm:
+    container_name: luna-robotic-arm-container
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    # Note: To map serial port devices into Docker (on Linux/WSL2 hosts), uncomment the line below:
+    # devices:
+    #   - "/dev/ttyUSB0:/dev/ttyUSB0"
+    restart: always
