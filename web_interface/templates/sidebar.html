@@ -22,6 +22,16 @@
             <span class="nav-icon">🛠️</span>
             <span>DIAGNOSTICS</span>
         </a>
+        <a href="/logs" class="nav-item {% if request.endpoint == 'logs' %}active{% endif %}"
+            id="side-nav-logs">
+            <span class="nav-icon">📊</span>
+            <span>MISSION LOGS</span>
+        </a>
+        <a href="/profile" class="nav-item {% if request.endpoint == 'profile' %}active{% endif %}"
+            id="side-nav-profile">
+            <span class="nav-icon">👤</span>
+            <span>OPERATOR PROFILE</span>
+        </a>
         <a href="/login-history" class="nav-item {% if request.endpoint == 'login_history' %}active{% endif %}"
             id="side-nav-login-history">
             <span class="nav-icon">🛡️</span>

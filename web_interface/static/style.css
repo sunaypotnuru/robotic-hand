@@ -865,7 +865,7 @@ input:checked+.toggle-slider:before {
     }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1150px) {
     .main-grid {
         grid-template-columns: 1fr;
     }

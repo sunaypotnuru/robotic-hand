@@ -34,6 +34,11 @@ class VoiceCommandProcessor:
         self.microphone = None
         self.is_listening = False
         
+        # AI Directive and Settings state (Fix Bug 2.7)
+        self.system_prompt = ""
+        self.personality_tone = "professional"
+        self.response_length = "brief"
+        
         # Guard Queue overflow (B4 - maximum size 10, drop oldest if full)
         self.command_queue = queue.Queue(maxsize=10)
         self.lock = threading.Lock()
@@ -77,7 +82,18 @@ class VoiceCommandProcessor:
         self.tts_lock = threading.Lock()
         self.init_tts()
         
-        # --- WHISPER / SR SETUP (GPU Accelerated Fallbacks - Part 2.4) ---
+        # --- AUDIO SOURCE & SPEECH RECOGNIZER SETUP (Globally required for both backends - Fix Bug 3) ---
+        try:
+            import speech_recognition as sr
+            self.speech_recognizer = sr.Recognizer()
+            self.microphone = sr.Microphone()
+            with self.microphone as source:
+                self.speech_recognizer.adjust_for_ambient_noise(source, duration=1)
+            logger.info("✅ Microphone & Speech Recognition initialized")
+        except Exception as e:
+            logger.error(f"⚠️ Microphone setup error: {e}")
+
+        # --- WHISPER / SR SETUP (GPU Accelerated Fallbacks) ---
         if use_whisper:
             try:
                 # Attempt CUDA/GPU acceleration using faster-whisper or standard whisper
@@ -97,17 +113,7 @@ class VoiceCommandProcessor:
             except Exception as e:
                 logger.error(f"⚠️ Whisper initialization error: {e}. Falling back to Google Speech Recognition")
                 self.use_whisper = False
-        
-        if not self.use_whisper:
-            try:
-                import speech_recognition as sr
-                self.speech_recognizer = sr.Recognizer()
-                self.microphone = sr.Microphone()
-                with self.microphone as source:
-                    self.speech_recognizer.adjust_for_ambient_noise(source, duration=1)
-                logger.info("✅ Speech Recognition initialized (Google API)")
-            except Exception as e:
-                logger.error(f"⚠️ Speech Recognition initialization error: {e}")
+
 
     def init_tts(self):
         """Initialize Text-to-Speech engine"""
@@ -176,11 +182,18 @@ class VoiceCommandProcessor:
             except Exception as e:
                 logger.error(f"⚠️ Failed to parse complex macro command via local Ollama: {e}")
 
+        # Direct injection of dynamic personality parameters (Fix Bug 2.7)
+        tone_instruction = f"Respond in a {self.personality_tone} tone, keeping the response {self.response_length}."
+        directive_instruction = f"System directive/personality: {self.system_prompt}" if self.system_prompt else ""
+
         # 1. Query Local Ollama LLM first (Part 2.3)
         try:
             prompt = f"""
             You are LUNA, a robotic arm. User command: '{user_text}'.
             My Hardware: 4 Motors (IDs: 2=Elbow, 3=Wrist Pitch, 4=Wrist Roll, 5-9=Fingers).
+            
+            Personality Guidelines: {tone_instruction}
+            {directive_instruction}
             
             Analyze the request and return valid JSON ONLY.
             Format:
@@ -219,6 +232,9 @@ class VoiceCommandProcessor:
                 You are LUNA, a robotic arm. User said: '{user_text}'.
                 My Hardware: 4 Motors (IDs: 2=Elbow, 3=Wrist Pitch, 4=Wrist Roll, 5-9=Fingers).
                 
+                Personality Guidelines: {tone_instruction}
+                {directive_instruction}
+                
                 Analyze the request and return valid JSON ONLY.
                 Format:
                 {{
@@ -249,21 +265,23 @@ class VoiceCommandProcessor:
         return self.basic_parse_command(user_text)
 
     def basic_parse_command(self, text):
-        """Legacy keyword parser (Fallback)"""
+        """Legacy keyword parser (Fallback - Fix Bug 4)"""
         if not text: return None
         text = text.lower()
         command = {'type': None, 'action': None, 'motor_values': {}}
 
         if 'arm up' in text:
-            command.update({'type': 'motor', 'action': 'arm_up', 'motor_values': {2: 0}})
+            command.update({'type': 'motor', 'action': 'up', 'motor_id': 2, 'value': 0, 'motor_values': {2: 0}})
         elif 'arm down' in text:
-            command.update({'type': 'motor', 'action': 'arm_down', 'motor_values': {2: 180}})
+            command.update({'type': 'motor', 'action': 'down', 'motor_id': 2, 'value': 180, 'motor_values': {2: 180}})
         elif 'open hand' in text:
-            command.update({'type': 'hand', 'action': 'open', 'motor_values': {5: 0, 6: 0, 7: 0, 8: 0, 9: 0}})
+            command.update({'type': 'hand', 'action': 'open', 'value': 0, 'fingers': [5, 6, 7, 8, 9], 'motor_values': {5: 0, 6: 0, 7: 0, 8: 0, 9: 0}})
         elif 'close hand' in text or 'grab' in text:
-            command.update({'type': 'hand', 'action': 'close', 'motor_values': {5: 180, 6: 180, 7: 180, 8: 180, 9: 180}})
+            command.update({'type': 'hand', 'action': 'close', 'value': 180, 'fingers': [5, 6, 7, 8, 9], 'motor_values': {5: 180, 6: 180, 7: 180, 8: 180, 9: 180}})
         elif 'stop' in text:
-            command.update({'type': 'system', 'action': 'emergency_stop', 'motor_values': {}})
+            command.update({'type': 'system', 'action': 'emergency_stop'})
+        elif 'home' in text:
+            command.update({'type': 'system', 'action': 'home_position'})
         else:
             return None
         return command

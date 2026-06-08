@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app import app, db, User, SiteContent, TeamMember
 from werkzeug.security import generate_password_hash
 from dotenv import load_dotenv
@@ -41,12 +43,16 @@ def bootstrap():
             'contact_phone': '+1 555-LUNA',
             'contact_address': 'Grid Sector 7, Neo-Tech District',
             'contact_github': 'https://github.com/sunaypotnuru/Healix',
-            'contact_linkedin': 'https://linkedin.com/company/invicta-labs'
+            'contact_linkedin': 'https://linkedin.com/company/invicta-labs',
+            'institution_website': 'https://universalai.in/',
+            'tech_specs_hardware': 'Arduino Mega 2560, PCA9685 PWM Driver, VL53L0X Distance Sensor, MPU6050 Accelerometer',
+            'tech_specs_brain': 'Google Gemini AI for Natural Language Voice Processing, YOLOv8 for Object Detection & Mimicry'
         }
 
         for section, content in initial_content.items():
             if not SiteContent.query.filter_by(page_section=section).first():
                 db.session.add(SiteContent(page_section=section, content_text=content))
+
         
         print("[SUCCESS] Initial CMS content populated.")
 

@@ -144,7 +144,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.Enum('admin', 'operator', name='user_roles'), nullable=False, default='operator')
+    role = db.Column(db.String(20), nullable=False, default='operator')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Profile Info
@@ -329,13 +329,15 @@ left_serial_lock = threading.Lock()
 right_serial_lock = threading.Lock()
 
 ping_failures = 0
+last_pong_time = time.time()  # Track last watchdog response (Fix Bug 1)
 
 def serial_heartbeat_thread():
     """
-    Watchdog thread verifying serial connection and executing recovery if 3 consecutive failures occur (B1/A1 Upgrade)
+    Watchdog thread verifying serial connection and executing recovery if 3 consecutive failures occur (B1/A1 Upgrade - Fix Bug 1)
     """
-    global arduino_serial, ping_failures
+    global arduino_serial, ping_failures, last_pong_time
     logger.info("[THREAD] Serial heartbeat watchdog active using PING/PONG protocol")
+    last_pong_time = time.time()
     while True:
         time.sleep(5)
         if not robot_state['connected']:
@@ -343,26 +345,22 @@ def serial_heartbeat_thread():
         try:
             with serial_lock:
                 if arduino_serial and arduino_serial.is_open:
-                    # Clear input buffer to ensure fresh response
-                    arduino_serial.reset_input_buffer()
                     # Write ping command
                     arduino_serial.write(b"PING\n")
-                    
-                    # Read using non-blocking timeout of 1.0s
-                    arduino_serial.timeout = 1.0
-                    response = arduino_serial.readline().decode('utf-8', errors='ignore').strip()
-                    arduino_serial.timeout = SERIAL_TIMEOUT
-                    
-                    if "PONG" in response or "STATUS" in response or "OK" in response or "SYSTEM" in response:
-                        ping_failures = 0
-                    else:
-                        logger.warning(f"[WATCHDOG] Watchdog received unexpected response or timeout: '{response}'")
-                        ping_failures += 1
-                else:
-                    ping_failures += 1
+                    logger.debug("[WATCHDOG] Sent PING to main serial port")
+            
+            # Wait 1.5 seconds for reader thread to process response
+            time.sleep(1.5)
+            
+            # Watchdog timeout check (allow 7.5 seconds of silence)
+            if time.time() - last_pong_time > 7.5:
+                logger.warning(f"[WATCHDOG] Watchdog detected heartbeat timeout. Last pong was {time.time() - last_pong_time:.1f}s ago")
+                ping_failures += 1
+            else:
+                ping_failures = 0
             
             if ping_failures >= 3:
-                logger.warning("⚠️ Serial watchdog detected 3 failed pings. Re-initializing connection...")
+                logger.warning("⚠️ Serial watchdog detected 3 failed heartbeats. Re-initializing connection...")
                 ping_failures = 0
                 with serial_lock:
                     if arduino_serial:
@@ -372,8 +370,9 @@ def serial_heartbeat_thread():
                             pass
                     init_serial_connection()
         except Exception as e:
-            logger.error(f"[WATCHDOG] Watchdog ping exception: {e}")
+            logger.error(f"[WATCHDOG] Watchdog exception: {e}")
             ping_failures += 1
+
 
 # AI Modules
 object_detector = None
@@ -424,6 +423,7 @@ def find_arduino_port():
 def init_serial_connection():
     """Initialize serial connections to one or two Arduinos (Bimanual support - COM3, COM4) (Feature 3.4)"""
     global arduino_serial, arduino_left, arduino_right, SERIAL_PORT
+    global right_serial_lock, left_serial_lock, serial_lock
     
     # Initialize bimanual left arm (COM3)
     try:
@@ -458,6 +458,8 @@ def init_serial_connection():
                 )
                 time.sleep(2)  # Wait for Arduino to initialize
                 arduino_right = arduino_serial
+                # Unify write locks if standard port is shared by right arm (Fix Bug 1)
+                right_serial_lock = serial_lock
                 robot_state['connected'] = True
                 logger.info(f"[OK] Connected to Standard Arm on {SERIAL_PORT}")
                 return True
@@ -471,6 +473,8 @@ def init_serial_connection():
             return False
     else:
         arduino_serial = arduino_right
+        # Unify write locks (Fix Bug 1)
+        right_serial_lock = serial_lock
         robot_state['connected'] = True
         return True
 def send_motor_command_arm(arm_id: str, motor_id: int, angle: int, force: bool = False) -> bool:
@@ -525,6 +529,10 @@ def wait_for_arm(arm_id: str, timeout: float = 2.0) -> bool:
 
 def send_motor_command(motor_id: int, angle: int, force: bool = False) -> bool:
     """Send standard motor command to the default right arm"""
+    # Boundary checks before modifying state (Fix Bug 9)
+    if motor_id < 2 or motor_id > 9:
+        logger.warning(f"[WARN] INVALID: Motor ID {motor_id} out of range (2-9)")
+        return False
     # Clamp angle first to prevent out-of-bounds state pollution
     angle = max(0, min(180, int(angle)))
     # Update default state
@@ -655,13 +663,19 @@ def emergency_stop() -> None:
 
 
 def serial_reader_thread():
-    """Background thread to read telemetry from Arduino"""
-    
+    """Background thread to read telemetry from Arduino (Fix Bug 1)"""
+    global last_pong_time
     while True:
         if arduino_serial and arduino_serial.is_open:
             try:
                 if arduino_serial.in_waiting:
                     line = arduino_serial.readline().decode('utf-8', errors='ignore').strip()
+                    
+                    # Intercept PONG watchdog response (Fix Bug 1)
+                    if "PONG" in line or "STATUS" in line or "OK" in line or "SYSTEM" in line:
+                        last_pong_time = time.time()
+                        logger.debug(f"[WATCHDOG] Received heartbeat pong: '{line}'")
+                        continue
                     
                     # Parse sensor data from ESP32 (forwarded by Arduino)
                     if line.startswith("SENSOR DATA: <"):
@@ -925,11 +939,11 @@ def settings():
 @login_required
 def diagnostics():
     """Render the interactive system diagnostics and telemetry dashboard"""
-    report_path = 'luna_diagnostic_report.json'
+    report_path = 'docs/luna_diagnostic_report.json'
     if not os.path.exists(report_path):
         try:
             import subprocess
-            subprocess.run(['python', 'diagnose_system.py'], check=True)
+            subprocess.run(['python', 'utils/diagnose_system.py'], check=True)
         except Exception as e:
             logger.error(f"[DIAGNOSTICS] Failed to auto-generate report: {e}")
     
@@ -1095,7 +1109,8 @@ def handle_macro_action(action, target, duration=0.0):
         batch = {i: 0 for i in range(5, 10)}
         send_batch_commands(batch)
     elif action == "wait":
-        time.sleep(max(0.0, float(duration)))
+        # Let the macro executor thread manage the sleep with cancellation checks (Fix Bug 7)
+        pass
 
 # Global Macro Executor Instance (Feature 3)
 macro_executor = MacroExecutor(socketio=socketio, command_sender=handle_macro_action) if MacroExecutor else None
@@ -1541,9 +1556,9 @@ def handle_delete_recording(data):
 
 @socketio.on('toggle_camera')
 def handle_toggle_camera(data):
-    """Toggle camera on/off"""
+    """Toggle camera on/off (Fix Bug 2.6)"""
     global camera
-    enable = data.get('enable', True)
+    enable = data.get('enable', True) if isinstance(data, dict) else True
     if not CV2_AVAILABLE:
         emit('camera_status', {'active': False, 'error': 'OpenCV not available'})
         return
@@ -1578,15 +1593,17 @@ def handle_toggle_camera(data):
 
 @socketio.on('update_ai_personality')
 def handle_update_ai_personality(data):
-    """Update AI voice/personality settings"""
+    """Update AI voice/personality settings (Fix Bug 2.7)"""
     if voice_processor:
         tone = data.get('tone', 'professional')
         response_length = data.get('response_length', 'brief')
+        prompt = data.get('prompt', '')
         # Store as attributes for future use in voice prompts
         voice_processor.personality_tone = tone
         voice_processor.response_length = response_length
-        emit('ai_personality_updated', {'success': True, 'tone': tone, 'response_length': response_length})
-        logger.info(f"[AI] Personality updated: tone={tone}, length={response_length}")
+        voice_processor.system_prompt = prompt
+        emit('ai_personality_updated', {'success': True, 'tone': tone, 'response_length': response_length, 'prompt': prompt})
+        logger.info(f"[AI] Personality updated: tone={tone}, length={response_length}, prompt={len(prompt)} chars")
     else:
         emit('ai_personality_updated', {'success': False, 'error': 'Voice processor not available'})
 
@@ -1865,24 +1882,29 @@ def command_execution_loop():
                                                 lambda text: socketio.emit('robot_speech', {'text': text}))
                             
                         # Step 1: Open fingers fully to prepare grab (Servos 5-9 to 0 degrees)
-                        send_batch_commands({5: 0, 6: 0, 7: 0, 8: 0, 9: 0})
-                        time.sleep(0.8)
+                        if not robot_state.get('emergency_stop'):
+                            send_batch_commands({5: 0, 6: 0, 7: 0, 8: 0, 9: 0})
+                            time.sleep(0.8)
                         
                         # Step 2: Pitch wrist forward towards target (Servo 3 to 120 degrees)
-                        send_motor_command(3, 120)
-                        time.sleep(1.0)
+                        if not robot_state.get('emergency_stop'):
+                            send_motor_command(3, 120)
+                            time.sleep(1.0)
                         
                         # Step 3: Securely clench all fingers (Servos 5-9 to 180 degrees)
-                        send_batch_commands({5: 180, 6: 180, 7: 180, 8: 180, 9: 180})
-                        time.sleep(1.2)
+                        if not robot_state.get('emergency_stop'):
+                            send_batch_commands({5: 180, 6: 180, 7: 180, 8: 180, 9: 180})
+                            time.sleep(1.2)
                         
                         # Step 4: Lift the arm with secured target (Servo 3 to 50 degrees)
-                        send_motor_command(3, 50)
-                        time.sleep(0.8)
+                        if not robot_state.get('emergency_stop'):
+                            send_motor_command(3, 50)
+                            time.sleep(0.8)
                         
-                        if voice_processor:
-                            voice_processor.speak("Target secured. Secure lift protocol complete.", 
-                                                lambda text: socketio.emit('robot_speech', {'text': text}))
+                        if not robot_state.get('emergency_stop'):
+                            if voice_processor:
+                                voice_processor.speak("Target secured. Secure lift protocol complete.", 
+                                                    lambda text: socketio.emit('robot_speech', {'text': text}))
                 else:
                     # Target lost counter
                     if not hasattr(command_execution_loop, 'lost_frames'):
@@ -1975,15 +1997,15 @@ def admin_call_graph():
     """Serve the interactive Graphify system call graph"""
     try:
         # Check if the graph HTML exists, if not generate it on the fly!
-        if not os.path.exists('LUNA_Call_Graph.html'):
+        if not os.path.exists('docs/LUNA_Call_Graph.html'):
             try:
                 # Run the graph generator script
                 import subprocess
-                subprocess.run(['python', 'luna_make_graph.py'], check=True)
+                subprocess.run(['python', 'utils/luna_make_graph.py'], check=True)
             except Exception as e:
                 logger.error(f"[GRAPHIFY] Failed to auto-generate graph: {e}")
         
-        return send_from_directory('.', 'LUNA_Call_Graph.html')
+        return send_from_directory('docs', 'LUNA_Call_Graph.html')
     except Exception as e:
         logger.error(f"[GRAPHIFY] Error serving call graph: {e}")
         return "System Call Graph is temporarily unavailable.", 500
@@ -2044,8 +2066,8 @@ def api_run_diagnostics():
     """API endpoint to run a fresh diagnostic profile and return results"""
     try:
         import subprocess
-        subprocess.run(['python', 'diagnose_system.py'], check=True)
-        report_path = 'luna_diagnostic_report.json'
+        subprocess.run(['python', 'utils/diagnose_system.py'], check=True)
+        report_path = 'docs/luna_diagnostic_report.json'
         if os.path.exists(report_path):
             with open(report_path, 'r', encoding='utf-8') as f:
                 report_data = json.load(f)
@@ -2307,64 +2329,71 @@ def init_ai_modules():
 if __name__ == '__main__':
     print("=" * 50)
     print("[START] LUNA Robotic Arm - Starting System")
-    # Initialize Database
-    with app.app_context():
-        try:
-            db.create_all()
-            logger.info("[DB] Database tables verified/created")
-        except Exception as e:
-            logger.error(f"[WARN] Database initialization failed (DB may be paused/offline): {e}")
-            logger.warning("[WARN] System will run in OFFLINE mode — authentication disabled, robot control still works")
+    
+    # Check if this is the reloader parent or the active worker
+    is_main_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug
+    
+    if is_main_process:
+        # Initialize Database
+        with app.app_context():
+            try:
+                db.create_all()
+                logger.info("[DB] Database tables verified/created")
+            except Exception as e:
+                logger.error(f"[WARN] Database initialization failed (DB may be paused/offline): {e}")
+                logger.warning("[WARN] System will run in OFFLINE mode — authentication disabled, robot control still works")
 
-    # Initialize serial connection
-    init_serial_connection()
-    
-    # Start serial writer threads
-    writer_thread = threading.Thread(target=serial_writer_thread, daemon=True)
-    writer_thread.start()
-    
-    left_writer_thread = threading.Thread(target=left_serial_writer_thread, daemon=True)
-    left_writer_thread.start()
-    
-    right_writer_thread = threading.Thread(target=right_serial_writer_thread, daemon=True)
-    right_writer_thread.start()
-    logger.info("[OK] Bimanual Serial writer threads started")
-    
-    # Start serial heartbeat watchdog thread (B1)
-    heartbeat_thread = threading.Thread(target=serial_heartbeat_thread, daemon=True)
-    heartbeat_thread.start()
-    logger.info("[OK] Serial heartbeat watchdog thread started")
-    
-    # Start asynchronous database logging worker (B5)
-    db_logger_thread = threading.Thread(target=async_batch_logger_thread, daemon=True)
-    db_logger_thread.start()
-    logger.info("[OK] Async batch logger thread started")
-    
-    # Start serial reader thread
-    if robot_state['connected']:
-        serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
-        serial_thread.start()
-        logger.info("[OK] Serial reader thread started")
-    
-    # Initialize AI modules (non-blocking)
-    ai_thread = threading.Thread(target=init_ai_modules, daemon=True)
-    ai_thread.start()
-    
-    # Wait for AI modules to initialize
-    time.sleep(3)
-    
-    # Start command execution loop (the "brain")
-    command_thread = threading.Thread(target=command_execution_loop, daemon=True)
-    command_thread.start()
-    logger.info("[OK] Command execution loop started")
-    
-    # Move to home position
-    time.sleep(1)
-    home_position()
-    
-    print("\n[WEB] Starting Flask server on http://localhost:5000")
-    print("[VIDEO] Video feed: http://localhost:5000/video_feed")
-    print("\n[INFO] Press Ctrl+C to stop\n")
+        # Initialize serial connection
+        init_serial_connection()
+        
+        # Start serial writer threads
+        writer_thread = threading.Thread(target=serial_writer_thread, daemon=True)
+        writer_thread.start()
+        
+        left_writer_thread = threading.Thread(target=left_serial_writer_thread, daemon=True)
+        left_writer_thread.start()
+        
+        right_writer_thread = threading.Thread(target=right_serial_writer_thread, daemon=True)
+        right_writer_thread.start()
+        logger.info("[OK] Bimanual Serial writer threads started")
+        
+        # Start serial heartbeat watchdog thread (B1)
+        heartbeat_thread = threading.Thread(target=serial_heartbeat_thread, daemon=True)
+        heartbeat_thread.start()
+        logger.info("[OK] Serial heartbeat watchdog thread started")
+        
+        # Start asynchronous database logging worker (B5)
+        db_logger_thread = threading.Thread(target=async_batch_logger_thread, daemon=True)
+        db_logger_thread.start()
+        logger.info("[OK] Async batch logger thread started")
+        
+        # Start serial reader thread
+        if robot_state['connected']:
+            serial_thread = threading.Thread(target=serial_reader_thread, daemon=True)
+            serial_thread.start()
+            logger.info("[OK] Serial reader thread started")
+        
+        # Initialize AI modules (non-blocking)
+        ai_thread = threading.Thread(target=init_ai_modules, daemon=True)
+        ai_thread.start()
+        
+        # Wait for AI modules to initialize
+        time.sleep(3)
+        
+        # Start command execution loop (the "brain")
+        command_thread = threading.Thread(target=command_execution_loop, daemon=True)
+        command_thread.start()
+        logger.info("[OK] Command execution loop started")
+        
+        # Move to home position
+        time.sleep(1)
+        home_position()
+        
+        print("\n[WEB] Starting Flask server on http://localhost:5000")
+        print("[VIDEO] Video feed: http://localhost:5000/video_feed")
+        print("\n[INFO] Press Ctrl+C to stop\n")
+    else:
+        print("[RELOADER] Reloader parent process started. Waiting for worker process...")
     
     # Run Flask app
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=True, allow_unsafe_werkzeug=True)

@@ -12,11 +12,15 @@ import time
 from datetime import datetime, timedelta
 
 # Import database models from app
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 try:
     from app import app, db, MissionLog, LoginHistory, User
 except ImportError as e:
     print(f"[ERROR] Error importing LUNA core modules: {e}")
     sys.exit(1)
+
 
 def print_cyber_header(title):
     print("\n" + "="*80)
@@ -107,7 +111,7 @@ def run_diagnostics():
                 "system": {"os": host_os, "cpu": host_cpu}
             }
 
-            report_path = "luna_diagnostic_report.json"
+            report_path = "docs/luna_diagnostic_report.json"
             with open(report_path, "w", encoding="utf-8") as f:
                 json.dump(report_data, f, indent=4)
             

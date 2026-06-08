@@ -21,7 +21,7 @@
 - **🎯 Motion Recording:** Record and playback sequences
 - **🛡️ Safety Systems:** Emergency stop, distance monitoring, input validation
 
-📖 **Full feature details:** [FEATURES.md](FEATURES.md)
+📖 **Full feature details:** [FEATURES.md](docs/FEATURES.md)
 
 ---
 
@@ -53,7 +53,7 @@ python app.py
 
 Then open **http://localhost:5000** in your browser.
 
-📚 **Detailed installation:** [INSTALLATION.md](INSTALLATION.md)
+📚 **Detailed installation:** [INSTALLATION.md](docs/INSTALLATION.md)
 
 ---
 
@@ -167,8 +167,8 @@ pytest tests/ --cov=. --cov-report=html
 
 ## 📄 Documentation
 
-- **[FEATURES.md](FEATURES.md)** - Complete feature documentation with testing instructions
-- **[INSTALLATION.md](INSTALLATION.md)** - Step-by-step installation guide
+- **[FEATURES.md](docs/FEATURES.md)** - Complete feature documentation with testing instructions
+- **[INSTALLATION.md](docs/INSTALLATION.md)** - Step-by-step installation guide
 - **[database_schema.sql](database_schema.sql)** - Database setup script
 
 ---
@@ -186,7 +186,7 @@ Specializing in computer vision, AI integration, and robotic control systems.
 ## 📞 Support
 
 - **Issues:** [GitHub Issues](https://github.com/your-repo/LUNA_ROBOTIC_ARM/issues)
-- **Documentation:** See FEATURES.md and INSTALLATION.md
+- **Documentation:** See docs/FEATURES.md and docs/INSTALLATION.md
 - **Email:** [contact@example.com](mailto:contact@example.com)
 
 ---

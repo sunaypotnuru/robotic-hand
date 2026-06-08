@@ -58,3 +58,7 @@ htmlcov/
 
 # Recordings
 recordings/*.json
+
+# Documentation folder (reorganized)
+docs/
+

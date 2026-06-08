@@ -39,6 +39,16 @@ let lastTwinUpdateTime = 0;
 const TWIN_UPDATE_INTERVAL = 100; // 10Hz update rate
 let twinEnabled = true;
 
+// Cleaning and Initialization State (Fix Bug 2.1)
+let joystickInstance = null;
+let handleTwinResize = null;
+let dashboardControlsInitialized = false;
+let settingsControlsInitialized = false;
+let calibrationControlsInitialized = false;
+let voiceCommandsInitialized = false;
+let gamepadInitialized = false;
+let throttleLastValues = {};
+
 // ==================== UTILITY: MJPEG STREAM THROTTLING ====================
 function throttleCameraFeed(active) {
     const videoFeed = document.getElementById('video-feed');
@@ -326,6 +336,7 @@ function updateTelemetryChart() {
 }
 
 function initDashboardControls() {
+    if (dashboardControlsInitialized) return;
     document.getElementById('toggle-camera')?.addEventListener('click', () => {
         socket.emit('toggle_camera');
     });
@@ -343,15 +354,26 @@ function initDashboardControls() {
         const container = document.getElementById('twin-container');
         if (container) container.style.opacity = twinEnabled ? '1' : '0.2';
     });
+    dashboardControlsInitialized = true;
 }
 
 function updateTelemetryUI() {
     const distEl = document.getElementById('distance-value');
-    if (distEl) distEl.textContent = `${robotState.sensors.distance} cm`;
+    if (distEl) {
+        const newText = `${robotState.sensors.distance} cm`;
+        if (distEl.textContent !== newText) {
+            distEl.textContent = newText;
+        }
+    }
 
     ['x', 'y', 'z'].forEach(axis => {
         const el = document.getElementById(`accel-${axis}-value`);
-        if (el) el.textContent = robotState.sensors[`accel_${axis}`].toFixed(2);
+        if (el) {
+            const newVal = robotState.sensors[`accel_${axis}`].toFixed(2);
+            if (el.textContent !== newVal) {
+                el.textContent = newVal;
+            }
+        }
     });
 
     updateDigitalTwin();
@@ -364,6 +386,39 @@ function initDigitalTwin() {
     const container = document.querySelector('.digital-twin-container');
     const canvas = document.getElementById('digital-twin');
     if (!container || !canvas) return;
+
+    // Clean up previous Digital Twin if it exists (Fix Bug 2.1)
+    if (renderer) {
+        console.log("♻️ Disposing of previous Three.js digital twin renderer...");
+        try {
+            renderer.dispose();
+        } catch (e) {
+            console.error("Error disposing renderer:", e);
+        }
+    }
+    if (scene) {
+        scene.traverse((object) => {
+            if (object.isMesh) {
+                if (object.geometry) {
+                    try {
+                        object.geometry.dispose();
+                    } catch (e) {}
+                }
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(mat => {
+                            try { mat.dispose(); } catch (e) {}
+                        });
+                    } else {
+                        try { object.material.dispose(); } catch (e) {}
+                    }
+                }
+            }
+        });
+    }
+
+    joints = {};
+    armModel = null;
 
     // Scene Setup
     scene = new THREE.Scene();
@@ -460,20 +515,25 @@ function initDigitalTwin() {
 
     animateDigitalTwin();
 
-    window.addEventListener('resize', () => {
+    if (handleTwinResize) {
+        window.removeEventListener('resize', handleTwinResize);
+    }
+    handleTwinResize = () => {
+        if (!container || !camera || !renderer) return;
         const width = container.clientWidth;
         const height = container.clientHeight;
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height);
-    });
+    };
+    window.addEventListener('resize', handleTwinResize);
 }
 
 function animateDigitalTwin() {
-    requestAnimationFrame(animateDigitalTwin);
     if (renderer && scene && camera) {
         renderer.render(scene, camera);
     }
+    requestAnimationFrame(animateDigitalTwin);
 }
 
 function updateDigitalTwin() {
@@ -516,12 +576,23 @@ function initVirtualJoystick() {
     const zone = document.getElementById('joystick-zone');
     if (!zone) return;
 
+    // Destroy existing joystick if present (Fix Bug 2.1)
+    if (joystickInstance) {
+        try {
+            joystickInstance.destroy();
+            console.log("♻️ Destroyed previous virtual joystick instance");
+        } catch (e) {
+            console.warn("Error destroying joystick:", e);
+        }
+        joystickInstance = null;
+    }
+
     // Support responsive scaling on mobile/touch interfaces
     const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     const joystickSize = isTouch ? 150 : 100;
     const joystickMode = isTouch ? 'dynamic' : 'static';
 
-    const inst = nipplejs.create({
+    joystickInstance = nipplejs.create({
         zone: zone,
         mode: joystickMode,
         position: isTouch ? undefined : { left: '50%', top: '50%' },
@@ -529,18 +600,19 @@ function initVirtualJoystick() {
         size: joystickSize
     });
 
-    inst.on('move', (evt, data) => {
+    joystickInstance.on('move', (evt, data) => {
         if (data.vector) {
             socket.emit('joystick_move', { x: data.vector.x, y: data.vector.y });
         }
     });
 
-    inst.on('end', () => socket.emit('joystick_move', { x: 0, y: 0 }));
+    joystickInstance.on('end', () => socket.emit('joystick_move', { x: 0, y: 0 }));
 }
 
 // ==================== SETTINGS LOGIC ====================
 
 function initSettingsControls() {
+    if (settingsControlsInitialized) return;
     document.getElementById('toggle-track')?.addEventListener('change', (e) => {
         socket.emit('toggle_track_mode', { enable: e.target.checked });
     });
@@ -554,6 +626,7 @@ function initSettingsControls() {
         socket.emit('update_ai_personality', { prompt: prompt });
         alert('Directive Uplinked to Brain.');
     });
+    settingsControlsInitialized = true;
 }
 
 // ==================== DIAGNOSTICS LOGIC ====================
@@ -561,6 +634,7 @@ function initSettingsControls() {
 let throttleTimeouts = {};
 
 function initCalibrationControls() {
+    if (calibrationControlsInitialized) return;
     for (let i = 2; i <= 9; i++) {
         const slider = document.getElementById(`motor-${i}-diag`);
         const valueEl = document.getElementById(`motor-${i}-value-diag`);
@@ -569,18 +643,25 @@ function initCalibrationControls() {
                 const angle = parseInt(e.target.value);
                 if (valueEl) valueEl.textContent = angle;
                 
-                // Add a robust 40ms input rate limiter (25Hz update cap)
-                if (!throttleTimeouts[i]) {
-                    throttleTimeouts[i] = true;
-                    setTimeout(() => {
-                        throttleTimeouts[i] = false;
-                    }, 40);
+                throttleLastValues[i] = angle;
 
+                // Implement trailing-edge and leading-edge hybrid throttle (Fix Bug 2.5)
+                if (!throttleTimeouts[i]) {
+                    // Send leading edge
                     socket.emit('motor_command', { motor_id: i, angle: angle });
+                    
+                    throttleTimeouts[i] = setTimeout(() => {
+                        // Check if a new value was received during the timeout
+                        if (throttleLastValues[i] !== undefined && throttleLastValues[i] !== angle) {
+                            socket.emit('motor_command', { motor_id: i, angle: throttleLastValues[i] });
+                        }
+                        throttleTimeouts[i] = null;
+                    }, 40);
                 }
             });
         }
     }
+    calibrationControlsInitialized = true;
 }
 
 function syncUIWithState() {
@@ -588,8 +669,14 @@ function syncUIWithState() {
         const slider = document.getElementById(`motor-${i}-diag`);
         const valueEl = document.getElementById(`motor-${i}-value-diag`);
         if (slider && robotState.motors[i] !== undefined) {
-            slider.value = robotState.motors[i];
-            if (valueEl) valueEl.textContent = robotState.motors[i];
+            const targetVal = robotState.motors[i];
+            // Only update if value is different to avoid layout thrashing (Fix Bug 2.9)
+            if (parseInt(slider.value) !== targetVal) {
+                slider.value = targetVal;
+            }
+            if (valueEl && parseInt(valueEl.textContent) !== targetVal) {
+                valueEl.textContent = targetVal;
+            }
         }
     }
 }
@@ -597,6 +684,7 @@ function syncUIWithState() {
 // ==================== VOICE COMMANDS ====================
 
 function initVoiceCommands() {
+    if (voiceCommandsInitialized) return;
     const startBtn = document.getElementById('start-voice');
     if (!startBtn) return;
 
@@ -614,11 +702,13 @@ function initVoiceCommands() {
             startBtn.classList.remove('btn-danger');
         }
     });
+    voiceCommandsInitialized = true;
 }
 
 // ==================== GAMEPAD CONTROL ====================
 
 function initGamepad() {
+    if (gamepadInitialized) return;
     window.addEventListener("gamepadconnected", (e) => {
         updateGamepadStatus(true);
         gamepadConnected = true;
@@ -635,6 +725,7 @@ function initGamepad() {
         gamepadConnected = true;
         startGamepadLoop();
     }
+    gamepadInitialized = true;
 }
 
 function updateGamepadStatus(connected) {
@@ -682,3 +773,43 @@ function startGamepadLoop() {
 
     requestAnimationFrame(startGamepadLoop);
 }
+
+// ==================== SECURITY AUDIT LOGS ====================
+window.initLoginHistory = async function() {
+    throttleCameraFeed(false);
+    const tableBody = document.getElementById('login-history-table-body');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #00f3ff;">CONNECTING TO CORE DATAFEED...</td></tr>`;
+    try {
+        const res = await fetch('/api/login-history');
+        const data = await res.json();
+        
+        if (!data.history || data.history.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #666;">No recorded session entries.</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = '';
+        data.history.forEach(entry => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid rgba(0, 243, 255, 0.1)';
+            const formattedTime = new Date(entry.login_time).toISOString().replace('T', ' ').substring(0, 19);
+            const statusBadge = entry.success 
+                ? `<span class="badge badge-success" style="background: rgba(0, 255, 100, 0.1); color: #00ff66; padding: 4px 8px; border-radius: 3px; border: 1px solid rgba(0, 255, 100, 0.3);">SUCCESS</span>`
+                : `<span class="badge badge-danger" style="background: rgba(255, 50, 50, 0.1); color: #ff3e3e; padding: 4px 8px; border-radius: 3px; border: 1px solid rgba(255, 50, 50, 0.3);">FAILED</span>`;
+
+            tr.innerHTML = `
+                <td style="padding: 12px; color: #aaa; font-family: monospace;">${entry.id}</td>
+                <td style="padding: 12px; color: #00f3ff; font-weight: bold; font-family: monospace;">${entry.ip_address}</td>
+                <td style="padding: 12px; color: #ccc; font-family: monospace; font-size: 0.85rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${entry.user_agent}">${entry.user_agent}</td>
+                <td style="padding: 12px; color: #888; font-family: monospace;">${formattedTime}</td>
+                <td style="padding: 12px; color: #fff; font-family: monospace;">${statusBadge}</td>
+            `;
+            tableBody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error("Failed to load login history:", e);
+        tableBody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #ff0055;">ERROR RETRIEVING SESSION DATA</td></tr>`;
+    }
+};

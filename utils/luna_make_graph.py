@@ -1,6 +1,9 @@
 import json
+import os
 
-data = json.load(open('luna_call_graph.json'))
+# Adjust paths to docs/ folder (Fix Bug 11)
+data = json.load(open(os.path.join('docs', 'luna_call_graph.json')))
+
 g = data['graph']
 nodes = g['nodes']
 edges = g['edges']
@@ -124,7 +127,7 @@ network.on('click', function(params) {{
 </body>
 </html>"""
 
-with open('LUNA_Call_Graph.html', 'w', encoding='utf-8') as f:
+with open('docs/LUNA_Call_Graph.html', 'w', encoding='utf-8') as f:
     f.write(html)
 
-print("SUCCESS: LUNA_Call_Graph.html created!")
+print("SUCCESS: docs/LUNA_Call_Graph.html created!")

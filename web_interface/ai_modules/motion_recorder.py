@@ -170,3 +170,22 @@ class MotionRecorder:
                     print(f"[WARN] Could not load {filename}: {e}")
         
         return sorted(recordings, key=lambda x: x['created'], reverse=True)
+        
+    def delete_recording(self, filename: str) -> bool:
+        """
+        Delete a recording file safely (Fix Bug 8)
+        """
+        if not filename.endswith('.json'):
+            filename += '.json'
+        
+        filepath = os.path.join(self.recordings_dir, filename)
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                print(f"[RECORDER] Safely deleted recording: {filepath}")
+                return True
+            except Exception as e:
+                print(f"[RECORDER] Error deleting {filepath}: {e}")
+                return False
+        return False
+

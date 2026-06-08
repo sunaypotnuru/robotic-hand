@@ -304,7 +304,7 @@
         <div id="page-diagnostics" class="page" style="display: none;">
             <header>
                 <div class="mission-info">
-                    <h1>SYSTEM DIAGNOSTICS</h1>
+                    <h1>SYSTEM DIAGNOSTICS & TELEMETRY PORTAL</h1>
                     <p>HOST: RTX 4060 | BRAIN: ARDUINO MEGA</p>
                 </div>
                 <div class="status-bar">
@@ -312,8 +312,18 @@
                 </div>
             </header>
 
-            <div class="diagnostics-grid" style="margin-top: 20px;">
-                <!-- System Health Panel -->
+            <div class="diag-title-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-bottom: 2px solid rgba(0, 243, 255, 0.1); padding-bottom: 15px;">
+                <h2 style="margin: 0; font-size: 1.5rem; color: #00f3ff; text-shadow: 0 0 10px rgba(0, 243, 255, 0.4); display: flex; align-items: center;">
+                    <span class="pulse-signal" style="width: 8px; height: 8px; border-radius: 50%; background: #00ff66; display: inline-block; box-shadow: 0 0 10px #00ff66; margin-right: 10px; animation: pulse-glow 1.5s infinite alternate;"></span>
+                    LUNA CORE TELEMETRY
+                </h2>
+                <button class="btn btn-primary" id="run-profile-btn" onclick="triggerDiagnosticRun()" style="background: linear-gradient(135deg, #ff0099, #8800ff); box-shadow: 0 0 15px rgba(255, 0, 153, 0.3);">
+                    RUN SYSTEM DIAGNOSTICS
+                </button>
+            </div>
+
+            <div class="diagnostics-grid" style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <!-- 1. System Health Panel -->
                 <div class="panel">
                     <h2>🏥 SYSTEM HEALTH</h2>
                     <ul class="health-list">
@@ -323,16 +333,88 @@
                         <li>MEMORY: <span id="system-memory">12%</span></li>
                     </ul>
                     <div class="emergency-block" style="margin-top: 20px;">
-                        <button id="emergency-btn-diag" class="btn btn-danger" style="width: 100%;">🛑 FORCE OVERRIDE
-                            STOP</button>
+                        <button id="emergency-btn-diag" class="btn btn-danger" style="width: 100%;">🛑 FORCE OVERRIDE STOP</button>
                     </div>
                 </div>
 
-                <!-- Motor Calibration Panel -->
+                <!-- 2. Specification -->
+                <div class="panel">
+                    <h2>🖥️ SYSTEM SPECIFICATION</h2>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Operating System</span>
+                        <span class="metric-value" id="spec-os" style="color: #fff; font-weight: 600;">{{ report.system.os if report else 'Loading...' }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">CPU Controller</span>
+                        <span class="metric-value" id="spec-cpu" style="color: #fff; font-weight: 600; font-size: 0.8rem;">{{ report.system.cpu if report else 'Loading...' }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Serial Watchdog</span>
+                        <span class="metric-value" style="color: #fff; font-weight: 600;">5.0s</span>
+                    </div>
+                </div>
+
+                <!-- 3. Operator Accounts -->
+                <div class="panel">
+                    <h2>👥 OPERATOR ACCOUNTS</h2>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Total Accounts</span>
+                        <span class="metric-value" id="ops-total" style="color: #fff; font-weight: 600;">{{ report.operators.total if report else 0 }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Administrators</span>
+                        <span class="metric-value" id="ops-admins" style="color: #fff; font-weight: 600;">{{ report.operators.admins if report else 0 }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Field Operators</span>
+                        <span class="metric-value" id="ops-operators" style="color: #fff; font-weight: 600;">{{ report.operators.operators if report else 0 }}</span>
+                    </div>
+                    <div class="progress-track" style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; margin-top: 5px;">
+                        <div class="progress-fill" id="ops-bar" style="height: 100%; background: linear-gradient(90deg, #00f3ff, #8800ff); width: 100%;"></div>
+                    </div>
+                </div>
+
+                <!-- 4. Security Uplink Logs -->
+                <div class="panel" id="security-card">
+                    <h2>🛡️ SECURITY AUDIT TRAIL</h2>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Attempts</span>
+                        <span class="metric-value" id="sec-attempts" style="color: #fff; font-weight: 600;">{{ report.security.attempts if report else 0 }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Failed Actions</span>
+                        <span class="metric-value" id="sec-failed" style="color: #ff3e3e; font-weight: 600;">{{ report.security.failed if report else 0 }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Uplink Rate</span>
+                        <span class="metric-value" id="sec-rate" style="color: #fff; font-weight: 600;">{{ "%.2f"|format(report.security.rate) if report else '0.00' }}%</span>
+                    </div>
+                    <div class="progress-track" style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; margin-top: 5px;">
+                        <div class="progress-fill" id="sec-bar" style="height: 100%; background: linear-gradient(90deg, #00f3ff, #8800ff); width: {{ report.security.rate if report else 0 }}%;"></div>
+                    </div>
+                </div>
+
+                <!-- 5. Robotics Serial Frame Delivery -->
+                <div class="panel">
+                    <h2>📡 SERIAL PACKET LOGISTICS</h2>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Total Emitted</span>
+                        <span class="metric-value" id="tel-commands" style="color: #fff; font-weight: 600;">{{ report.telemetry.total_commands if report else 0 }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">Recent 24h Frames</span>
+                        <span class="metric-value" id="tel-recent" style="color: #fff; font-weight: 600;">{{ report.telemetry.recent_24h if report else 0 }}</span>
+                    </div>
+                    <div class="metric-row" style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span class="metric-label" style="color: #94a3b8;">E-Stops Triggered</span>
+                        <span class="metric-value" id="tel-estops" style="color: #ffaa00; font-weight: 600;">{{ report.telemetry.estops if report else 0 }}</span>
+                    </div>
+                </div>
+
+                <!-- 6. Motor Calibration Panel -->
                 <div class="panel">
                     <h2>🔧 MOTOR CALIBRATION</h2>
                     <div class="motor-calibration-list">
-                        <!-- Motors 2-9 Sliders -->
                         {% for i in range(2, 10) %}
                         <div class="slider-group">
                             <label>MOTOR ID {{ i }}: <span id="motor-{{ i }}-value-diag">90</span>°</label>
@@ -343,10 +425,27 @@
                 </div>
             </div>
 
-            <!-- Persistent Speech Terminal -->
-            <div class="robot-speech-terminal" style="margin-top: 20px;">
-                <h3>🤖 SPEECH TERMINAL:</h3>
-                <div id="robot-speech-diag" class="robot-speech-text">Diagnostics mode active. Scanning systems...</div>
+            <!-- Terminal and Speech stream -->
+            <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                <!-- Live Telemetry Terminal HUD -->
+                <div class="panel">
+                    <h2>🖥️ COGNITIVE BRAIN & TELEMETRY STREAM</h2>
+                    <div class="console-hud" id="diag-console" style="background: #050811; border: 1px solid rgba(0, 243, 255, 0.15); border-radius: 8px; padding: 15px; font-family: monospace; font-size: 0.85rem; color: #00f3ff; max-height: 200px; overflow-y: auto;">
+                        <div class="console-line"><span class="console-prompt" style="color: #ff0099; margin-right: 10px; user-select: none;">&gt;</span><span class="console-text" style="white-space: pre-wrap;">Initializing telemetry channel...</span></div>
+                        <div class="console-line"><span class="console-prompt" style="color: #ff0099; margin-right: 10px; user-select: none;">&gt;</span><span class="console-text" style="white-space: pre-wrap;">LUNA connection established. Reading active database buffers...</span></div>
+                        {% if report %}
+                        <div class="console-line"><span class="console-prompt" style="color: #ff0099; margin-right: 10px; user-select: none;">&gt;</span><span class="console-text" style="white-space: pre-wrap;">Report Loaded successfully. Operating under {{ report.system.os }} with {{ report.telemetry.total_commands }} parsed commands.</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Persistent Speech Terminal -->
+                <div class="panel">
+                    <h2>🤖 SPEECH TERMINAL</h2>
+                    <div id="robot-speech-diag" class="robot-speech-text" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 5px; color: #00f3ff; font-family: monospace; min-height: 100px;">
+                        Diagnostics mode active. Scanning systems...
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -455,6 +554,35 @@
                         </a>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div id="page-login-history" class="page" style="display: none;">
+            <header>
+                <div class="mission-info">
+                    <h1>SECURITY AUDIT LOGS</h1>
+                </div>
+            </header>
+            <div class="panel" style="margin-top: 20px;">
+                <h2 style="color: #00f3ff; letter-spacing: 2px;">📋 MY RECENT LOGIN SESSIONS</h2>
+                <p class="hint" style="margin-bottom: 20px;">Operator session logs tracked locally for safety verification.</p>
+                
+                <table class="hud-table" style="width:100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 80px;">ID</th>
+                            <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 150px;">IP Address</th>
+                            <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05);">User Agent</th>
+                            <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 180px;">Timestamp</th>
+                            <th style="padding: 12px; text-align: left; color: #00f3ff; font-weight: bold; background: rgba(0,243,255,0.05); width: 120px;">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody id="login-history-table-body">
+                        <tr>
+                            <td colspan="5" style="padding: 30px; text-align: center; color: #888;">Loading session logs...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 

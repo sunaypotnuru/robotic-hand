@@ -6,7 +6,8 @@ const pages = {
     diagnostics: document.getElementById('page-diagnostics'),
     logs: document.getElementById('page-logs'),
     profile: document.getElementById('page-profile'),
-    admin: document.getElementById('page-admin')
+    admin: document.getElementById('page-admin'),
+    'login-history': document.getElementById('page-login-history')
 };
 
 let currentPage = null;
@@ -67,6 +68,9 @@ function initPage(pageName) {
         case 'profile':
             if (window.initProfile) window.initProfile();
             break;
+        case 'login-history':
+            if (window.initLoginHistory) window.initLoginHistory();
+            break;
         default:
             break;
     }
@@ -88,6 +92,13 @@ window.addEventListener('popstate', (event) => {
 
 // Intercept link clicks
 document.addEventListener('click', (e) => {
+    // Only intercept if the current page is part of the SPA shell
+    const currentPath = window.location.pathname;
+    const spaPaths = ['/', '/dashboard', '/settings', '/diagnostics', '/logs', '/profile', '/login-history'];
+    if (!spaPaths.includes(currentPath)) {
+        return; 
+    }
+
     const link = e.target.closest('a');
     if (!link) return;
 

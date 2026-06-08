@@ -67,14 +67,36 @@ CREATE INDEX IF NOT EXISTS idx_mission_logs_timestamp ON mission_logs(timestamp 
 CREATE INDEX IF NOT EXISTS idx_mission_logs_command ON mission_logs(command);
 
 -- ============================================
--- Insert Default Site Content
+-- Login History Table (Fix Bug 10 / Supabase alignment)
+-- ============================================
+CREATE TABLE IF NOT EXISTS login_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent VARCHAR(255) NOT NULL,
+    login_time TIMESTAMP DEFAULT NOW(),
+    success BOOLEAN DEFAULT TRUE
+);
+
+-- Create indexes for login history
+CREATE INDEX IF NOT EXISTS idx_login_history_user_id ON login_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_login_history_time ON login_history(login_time DESC);
+
+-- ============================================
+-- Insert Default Site Content (Fix Bug 6)
 -- ============================================
 INSERT INTO site_content (page_section, content_text) VALUES
-('about_intro', 'LUNA (Linked Universal Neural Arm) is an advanced AI-powered robotic arm system developed for research and education.'),
-('about_mission', 'Our mission is to make advanced robotics accessible through intuitive control interfaces and cutting-edge AI integration.'),
-('features_intro', 'LUNA combines multiple control methods, real-time computer vision, and natural language processing to create an intuitive robotic control experience.'),
-('contact_info', 'For inquiries about LUNA, please reach out through our contact form or email.')
+('about_description', 'LUNA (Linked Universal Neural Arm) is an advanced AI-powered robotic arm system developed for research and education.'),
+('contact_email', 'luna@invicta.io'),
+('contact_phone', '+1 555-LUNA'),
+('contact_address', 'Grid Sector 7, Neo-Tech District'),
+('contact_github', 'https://github.com/sunaypotnuru/Healix'),
+('contact_linkedin', 'https://linkedin.com/company/invicta-labs'),
+('institution_website', 'https://universalai.in/'),
+('tech_specs_hardware', 'Arduino Mega 2560, PCA9685 PWM Driver, VL53L0X Distance Sensor, MPU6050 Accelerometer'),
+('tech_specs_brain', 'Google Gemini AI for Natural Language Voice Processing, YOLOv8 for Object Detection & Mimicry')
 ON CONFLICT (page_section) DO NOTHING;
+
 
 -- ============================================
 -- Verification Queries
