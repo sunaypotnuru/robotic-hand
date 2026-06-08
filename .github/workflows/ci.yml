@@ -1,0 +1,130 @@
+# ==============================================================================
+# LUNA ROBOTIC ARM — Continuous Integration
+# Runs on every push and pull-request to `main`
+# ==============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [ "main", "dev", "feature/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel in-progress runs for the same branch / PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install linting tools
+        run: pip install flake8
+
+      - name: Run flake8
+        run: |
+          # Stop on syntax errors or undefined names; warn on style issues
+          flake8 . \
+            --count \
+            --select=E9,F63,F7,F82 \
+            --show-source \
+            --statistics \
+            --exclude=__pycache__,.git,.venv,venv,env,.pytest_cache,docs
+
+  # ────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Unit Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint
+
+    env:
+      # Provide dummy secrets so imports don't crash at collection time
+      SECRET_KEY: ci-test-secret-key
+      DATABASE_URL: sqlite:///test_ci.db
+      SUPABASE_URL: https://placeholder.supabase.co
+      SUPABASE_KEY: placeholder-key
+      GEMINI_API_KEY: placeholder-key
+      FLASK_ENV: testing
+      TESTING: "true"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      # System deps required by some wheels (OpenCV, PyAudio, psycopg2)
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            portaudio19-dev \
+            libasound2-dev \
+            libgl1 \
+            libglib2.0-0 \
+            libpq-dev
+
+      # Install only the lightweight subset needed for unit tests
+      # (torch, mediapipe, ultralytics are huge — skip unless needed)
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install \
+            Flask==3.0.0 \
+            flask-socketio==5.3.6 \
+            python-socketio==5.10.0 \
+            eventlet==0.33.3 \
+            Flask-Limiter==3.5.0 \
+            Flask-SQLAlchemy==3.1.1 \
+            Flask-Login==0.6.3 \
+            psycopg2-binary==2.9.9 \
+            pyserial==3.5 \
+            opencv-python-headless==4.8.1.78 \
+            numpy==1.24.3 \
+            protobuf==3.20.3 \
+            SpeechRecognition==3.10.0 \
+            pytest==7.4.3 \
+            pytest-cov==4.1.0 \
+            pytest-flask==1.3.0 \
+            python-dotenv==1.0.0 \
+            Werkzeug==3.0.1 \
+            Pillow
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/ \
+            -v \
+            --tb=short \
+            --strict-markers \
+            --disable-warnings \
+            -m "not hardware and not slow" \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --ignore=tests/evaluator
+
+      - name: Upload coverage to GitHub Summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14

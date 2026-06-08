@@ -1,0 +1,50 @@
+# ==============================================================================
+# LUNA ROBOTIC ARM — Docker Build Validation
+# Ensures the Docker image builds cleanly on every push to main
+# ==============================================================================
+
+name: Docker Build
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "requirements.txt"
+      - "app.py"
+      - "config.py"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "requirements.txt"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: luna-robotic-arm:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Build args — pass safe defaults so the build doesn't fail on missing secrets
+          build-args: |
+            FLASK_ENV=production

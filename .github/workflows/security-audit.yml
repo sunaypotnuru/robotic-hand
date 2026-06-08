@@ -1,0 +1,52 @@
+# ==============================================================================
+# LUNA ROBOTIC ARM — Dependency Security Audit
+# Runs weekly + on requirements.txt changes to catch known CVEs
+# ==============================================================================
+
+name: Security Audit
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  push:
+    branches: [ "main" ]
+    paths:
+      - "requirements.txt"
+  workflow_dispatch:   # Allow manual trigger from the Actions tab
+
+jobs:
+  audit:
+    name: pip-audit (CVE scan)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run security audit
+        # Continue even if vulnerabilities are found so we always get the report
+        continue-on-error: true
+        run: |
+          pip-audit -r requirements.txt \
+            --format markdown \
+            --output pip-audit-report.md
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.md
+          retention-days: 30
+
+      - name: Print audit summary
+        run: cat pip-audit-report.md || echo "No issues found."
