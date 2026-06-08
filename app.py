@@ -54,6 +54,11 @@ except Exception as e:
 
 from utils.validators import InputValidator
 
+# Global control flags for command execution loop
+track_mode_enabled = False
+mimic_mode_enabled = False
+teach_mode_enabled = False
+
 # Initialize Flask App
 app = Flask(__name__, 
             template_folder='web_interface/templates',
@@ -1415,10 +1420,7 @@ def handle_toggle_voice(data):
         socketio.emit('voice_status', {'listening': False, 'status': 'Not available'})
 
 
-# Global control flags for command execution loop
-track_mode_enabled = False
-mimic_mode_enabled = False
-teach_mode_enabled = False
+
 
 
 @socketio.on('toggle_track_mode')

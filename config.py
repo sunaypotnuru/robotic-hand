@@ -47,7 +47,7 @@ OBJECT_CONFIDENCE_THRESHOLD = 0.5
 OBJECT_IOU_THRESHOLD = 0.45
 
 # Hand Detection Model (YOLOv8n-pose - Nano with Pose)
-YOLO_HAND_MODEL_PATH = 'models/yolov8n-pose.pt'  # Will download if not found
+YOLO_HAND_MODEL_PATH = 'models/yolov8n-hand.pt'  # Will download if not found
 HAND_CONFIDENCE_THRESHOLD = 0.7  # Higher for safety
 HAND_IOU_THRESHOLD = 0.45
 

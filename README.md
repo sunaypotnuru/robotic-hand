@@ -1,5 +1,6 @@
 # 🤖 LUNA Robotic Arm Control System
 
+[![CI](https://github.com/sunaypotnuru/robotic-hand/actions/workflows/ci.yml/badge.svg)](https://github.com/sunaypotnuru/robotic-hand/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)](https://flask.palletsprojects.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -29,8 +30,8 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/your-repo/LUNA_ROBOTIC_ARM.git
-cd LUNA_ROBOTIC_ARM
+git clone https://github.com/sunaypotnuru/robotic-hand.git
+cd robotic-hand
 
 # Setup Python environment
 python -m venv venv
@@ -42,10 +43,10 @@ cp .env.example .env
 nano .env
 
 # Initialize database and admin user
-python create_admin.py
+python utils/create_admin.py
 
 # Download YOLO models
-python download_models.py
+python utils/download_models.py
 
 # Start server
 python app.py
@@ -185,7 +186,7 @@ Specializing in computer vision, AI integration, and robotic control systems.
 
 ## 📞 Support
 
-- **Issues:** [GitHub Issues](https://github.com/your-repo/LUNA_ROBOTIC_ARM/issues)
+- **Issues:** [GitHub Issues](https://github.com/sunaypotnuru/robotic-hand/issues)
 - **Documentation:** See docs/FEATURES.md and docs/INSTALLATION.md
 - **Email:** [contact@example.com](mailto:contact@example.com)
 

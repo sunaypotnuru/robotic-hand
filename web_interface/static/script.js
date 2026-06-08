@@ -170,19 +170,23 @@ window.initDiagnostics = function() {
     initCalibrationControls();
 };
 
-window.initLogs = async function() {
+let currentLogsPage = 1;
+let logsPaginationWired = false;
+
+window.initLogs = async function(page = 1) {
     throttleCameraFeed(false);
-    // Initialize or refresh mission logs asynchronously if needed
+    currentLogsPage = page;
     const tableBody = document.getElementById('logs-table-body');
     if (!tableBody) return;
 
     tableBody.innerHTML = `<tr><td colspan="3" style="padding: 20px; text-align: center; color: #00f3ff;">CONNECTING TO CORE DATAFEED...</td></tr>`;
     try {
-        const res = await fetch('/api/logs?page=1&per_page=15');
+        const res = await fetch(`/api/logs?page=${page}&per_page=15`);
         const data = await res.json();
         
         if (!data.logs || data.logs.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="3" style="padding: 20px; text-align: center; color: #666;">No recorded mission entries.</td></tr>`;
+            document.getElementById('logs-pagination').style.display = 'none';
             return;
         }
 
@@ -201,9 +205,45 @@ window.initLogs = async function() {
             `;
             tableBody.appendChild(tr);
         });
+
+        // Pagination UI handling
+        const paginationDiv = document.getElementById('logs-pagination');
+        const prevBtn = document.getElementById('logs-prev-btn');
+        const nextBtn = document.getElementById('logs-next-btn');
+        const pageInfo = document.getElementById('logs-page-info');
+
+        if (paginationDiv && pageInfo) {
+            paginationDiv.style.display = 'flex';
+            pageInfo.textContent = `Page ${data.page} of ${data.pages}`;
+
+            if (prevBtn) {
+                prevBtn.disabled = !data.has_prev;
+                prevBtn.style.opacity = data.has_prev ? '1' : '0.5';
+                prevBtn.style.cursor = data.has_prev ? 'pointer' : 'not-allowed';
+            }
+            if (nextBtn) {
+                nextBtn.disabled = !data.has_next;
+                nextBtn.style.opacity = data.has_next ? '1' : '0.5';
+                nextBtn.style.cursor = data.has_next ? 'pointer' : 'not-allowed';
+            }
+
+            if (!logsPaginationWired) {
+                prevBtn?.addEventListener('click', () => {
+                    if (currentLogsPage > 1) {
+                        window.initLogs(currentLogsPage - 1);
+                    }
+                });
+                nextBtn?.addEventListener('click', () => {
+                    window.initLogs(currentLogsPage + 1);
+                });
+                logsPaginationWired = true;
+            }
+        }
     } catch (e) {
         console.error("Failed to load logs:", e);
         tableBody.innerHTML = `<tr><td colspan="3" style="padding: 20px; text-align: center; color: #ff0055;">ERROR RETRIEVING MISSION DATA</td></tr>`;
+        const paginationDiv = document.getElementById('logs-pagination');
+        if (paginationDiv) paginationDiv.style.display = 'none';
     }
 };
 
@@ -811,5 +851,66 @@ window.initLoginHistory = async function() {
     } catch (e) {
         console.error("Failed to load login history:", e);
         tableBody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; color: #ff0055;">ERROR RETRIEVING SESSION DATA</td></tr>`;
+    }
+};
+
+window.triggerDiagnosticRun = async function() {
+    const btn = document.getElementById('run-profile-btn');
+    if (!btn) return;
+
+    const originalText = btn.textContent;
+    btn.textContent = 'RUNNING DIAGNOSTICS...';
+    btn.disabled = true;
+
+    // Append to console HUD
+    const consoleHud = document.getElementById('diag-console');
+    const appendConsole = (text) => {
+        if (!consoleHud) return;
+        const line = document.createElement('div');
+        line.className = 'console-line';
+        line.innerHTML = `<span class="console-prompt" style="color: #ff0099; margin-right: 10px; user-select: none;">&gt;</span><span class="console-text" style="white-space: pre-wrap;">${text}</span>`;
+        consoleHud.appendChild(line);
+        consoleHud.scrollTop = consoleHud.scrollHeight;
+    };
+
+    appendConsole("Triggering auto-diagnostic profiler subprocess...");
+
+    try {
+        const res = await fetch('/api/diagnostics/run');
+        const data = await res.json();
+
+        if (data.success && data.report) {
+            const report = data.report;
+            appendConsole("Diagnostic completed successfully! Updating telemetry cards...");
+
+            // Update UI elements
+            if (document.getElementById('spec-os')) document.getElementById('spec-os').textContent = report.system.os || 'N/A';
+            if (document.getElementById('spec-cpu')) document.getElementById('spec-cpu').textContent = report.system.cpu || 'N/A';
+            
+            if (document.getElementById('ops-total')) document.getElementById('ops-total').textContent = report.operators.total || 0;
+            if (document.getElementById('ops-admins')) document.getElementById('ops-admins').textContent = report.operators.admins || 0;
+            if (document.getElementById('ops-operators')) document.getElementById('ops-operators').textContent = report.operators.operators || 0;
+
+            if (document.getElementById('sec-attempts')) document.getElementById('sec-attempts').textContent = report.security.attempts || 0;
+            if (document.getElementById('sec-failed')) document.getElementById('sec-failed').textContent = report.security.failed || 0;
+            if (document.getElementById('sec-rate')) document.getElementById('sec-rate').textContent = (report.security.rate !== undefined ? report.security.rate.toFixed(2) : '0.00') + '%';
+            if (document.getElementById('sec-bar')) document.getElementById('sec-bar').style.width = (report.security.rate || 0) + '%';
+
+            if (document.getElementById('tel-commands')) document.getElementById('tel-commands').textContent = report.telemetry.total_commands || 0;
+            if (document.getElementById('tel-recent')) document.getElementById('tel-recent').textContent = report.telemetry.recent_24h || 0;
+            if (document.getElementById('tel-estops')) document.getElementById('tel-estops').textContent = report.telemetry.estops || 0;
+
+            appendConsole(`System status: OS=${report.system.os}, Commands=${report.telemetry.total_commands}`);
+        } else {
+            appendConsole(`Error: ${data.message || 'Unknown diagnostic error'}`);
+            alert(data.message || 'Failed to execute diagnostic profiler.');
+        }
+    } catch (e) {
+        console.error("Failed to run diagnostics:", e);
+        appendConsole("CRITICAL ERROR: Connection to core diagnostic endpoint timed out or failed.");
+        alert('Error communicating with backend server.');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 };

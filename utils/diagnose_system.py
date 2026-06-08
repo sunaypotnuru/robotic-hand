@@ -12,8 +12,6 @@ import time
 from datetime import datetime, timedelta
 
 # Import database models from app
-import os
-import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 try:
     from app import app, db, MissionLog, LoginHistory, User

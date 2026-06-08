@@ -1,8 +1,19 @@
 import json
 import os
+import sys
 
 # Adjust paths to docs/ folder (Fix Bug 11)
-data = json.load(open(os.path.join('docs', 'luna_call_graph.json')))
+json_path = os.path.join('docs', 'luna_call_graph.json')
+if not os.path.exists(json_path):
+    print(f"Error: {json_path} not found. Cannot generate call graph HTML.")
+    sys.exit(1)
+
+try:
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+except Exception as e:
+    print(f"Error reading {json_path}: {e}")
+    sys.exit(1)
 
 g = data['graph']
 nodes = g['nodes']
@@ -32,6 +43,9 @@ edge_iter = edges.items() if isinstance(edges, dict) else enumerate(edges)
 for uid, edge in edge_iter:
     vis_edges.append({'from': edge['source'], 'to': edge['target'], 'arrows': 'to', 'color': {'color': 'rgba(0,243,255,0.4)'}})
 
+num_nodes = len(vis_nodes)
+num_edges = len(vis_edges)
+
 graph_json = json.dumps({'nodes': vis_nodes, 'edges': vis_edges}, indent=2)
 
 html = f"""<!DOCTYPE html>
@@ -58,7 +72,7 @@ html = f"""<!DOCTYPE html>
 <div id="header">
   <div>
     <h1>&#129302; LUNA — CODEBASE CALL GRAPH</h1>
-    <p>79 nodes &bull; 94 edges &bull; Scroll to zoom &bull; Drag to pan &bull; Click node for details</p>
+    <p>{num_nodes} nodes &bull; {num_edges} edges &bull; Scroll to zoom &bull; Drag to pan &bull; Click node for details</p>
   </div>
   <div id="legend">
     <span><span class="dot" style="background:#00f3ff"></span>app.py</span>

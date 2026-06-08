@@ -82,7 +82,6 @@ def download_models():
     models_info = [
         ("Object Detection", obj_model_path, "YOLOv8m", "~50 MB", "90%+ mAP"),
         ("Hand Detection", hand_model_path, "YOLOv8n-pose", "~6 MB", "98%+ mAP"),
-        ("Legacy (fallback)", legacy_model_path, "YOLOv8n", "~6 MB", "85% mAP"),
     ]
     
     all_present = True

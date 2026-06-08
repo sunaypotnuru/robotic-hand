@@ -1222,3 +1222,59 @@ nav.hud-nav {
     padding: 30px;
     width: calc(100% - 250px);
 }
+
+/* ==================== ADDED HUD & DIAGNOSTIC UTILITIES ==================== */
+
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 0 5px rgba(0, 255, 102, 0.4), 0 0 10px rgba(0, 255, 102, 0.2);
+        opacity: 0.6;
+    }
+    100% {
+        box-shadow: 0 0 15px rgba(0, 255, 102, 0.9), 0 0 25px rgba(0, 255, 102, 0.5);
+        opacity: 1;
+    }
+}
+
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.health-list {
+    list-style: none;
+    padding: 0;
+    margin: 15px 0 0 0;
+}
+.health-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+.health-list li:last-child {
+    border-bottom: none;
+}
+
+.content-body {
+    margin-top: 20px;
+}
+
+.hud-green {
+    color: var(--hud-green, #00ff66) !important;
+    text-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+    font-weight: bold;
+}
+
+.motor-slider-diag {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+    transition: background 0.3s;
+}

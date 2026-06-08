@@ -1,0 +1,47 @@
+# ==============================================================================
+# LUNA ROBOTIC ARM - Docker Ignore Configurations
+# Exclude sensitive keys, models, artifacts, and local configurations
+# ==============================================================================
+
+# Git files
+.git/
+.gitignore
+
+# Environment secrets (CRITICAL - Prevent baking secrets into the image)
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Local development / temporary files
+.pytest_cache/
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Heavy ML Models (Downloaded at runtime or mounted)
+*.pt
+*.glb
+*.bin
+models/
+
+# Recordings and recordings data
+recordings/
+!recordings/.gitkeep
+
+# Local user media / uploads
+web_interface/static/uploads/*
+!web_interface/static/uploads/.gitkeep
+
+# Documentation & Reports
+docs/
+LUNA_verification_report.md
+luna_verify.py
+
+# Tests & Coverage
+tests/
+.coverage
+htmlcov/
