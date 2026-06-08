@@ -1,0 +1,37 @@
+[flake8]
+# ==============================================================================
+# LUNA Robotic Arm — flake8 configuration
+# ==============================================================================
+
+# Only flag genuine show-stoppers that indicate broken code:
+#   E9xx  = SyntaxError, IndentationError, IOError
+#   F63x  = invalid assert, invalid star-import
+#   F7xx  = syntax / statement errors (break outside loop, etc.)
+#
+# F82x (F821 undefined name, F824 global never assigned) is intentionally
+# excluded because Flask apps heavily use module-level globals and lazy
+# imports that are invisible to static analysis.
+select = E9,F63,F7
+
+# Directories that should never be linted
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    ENV,
+    .pytest_cache,
+    docs,
+    recordings,
+    firmware,
+    hardware
+
+# Maximum line length (not enforced in CI, just for editor guidance)
+max-line-length = 120
+
+# Show source snippet alongside each error
+show-source = True
+
+# Show statistics summary
+statistics = True

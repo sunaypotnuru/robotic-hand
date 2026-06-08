@@ -37,10 +37,14 @@ jobs:
 
       - name: Run flake8
         run: |
-          # Stop on syntax errors or undefined names; warn on style issues
+          # E9   = syntax errors (SyntaxError, IndentationError, etc.)
+          # F63  = invalid assert / star imports
+          # F7   = syntax/statement errors (break outside loop, etc.)
+          # F82x excluded — fires as false positives on Flask module-level
+          #   globals (F821 undefined name, F824 global never assigned)
           flake8 . \
             --count \
-            --select=E9,F63,F7,F82 \
+            --select=E9,F63,F7 \
             --show-source \
             --statistics \
             --exclude=__pycache__,.git,.venv,venv,env,.pytest_cache,docs
